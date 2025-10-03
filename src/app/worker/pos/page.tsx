@@ -84,11 +84,11 @@ export default function POSPage() {
     if (clientsData) setClients(clientsData);
     
     if (rentalsData) {
-      const formattedRentals = rentalsData.map((r: any) => ({
+      const formattedRentals = rentalsData.map((r: { id: number; client_id: number | null; clients?: { name: string } | { name: string }[]; tables?: { name: string } | { name: string }[] }) => ({
         id: r.id,
         client_id: r.client_id,
-        client_name: r.clients?.[0]?.name || r.clients?.name || 'Cliente Anónimo',
-        table_name: r.tables?.[0]?.name || r.tables?.name || 'Mesa'
+        client_name: Array.isArray(r.clients) ? r.clients[0]?.name : r.clients?.name || 'Cliente Anónimo',
+        table_name: Array.isArray(r.tables) ? r.tables[0]?.name : r.tables?.name || 'Mesa'
       }));
       setRentals(formattedRentals);
     }
@@ -224,9 +224,9 @@ export default function POSPage() {
         <div className="p-4 md:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             {/* Productos */}
-            <div className="lg:col-span-2">
-              <h2 className="text-2xl font-bold mb-6">📦 Productos Disponibles</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="lg:col-span-2 order-2 lg:order-1">
+              <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">📦 Productos Disponibles</h2>
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -242,8 +242,8 @@ export default function POSPage() {
             </div>
 
             {/* Carrito */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-4">
+            <div className="lg:col-span-1 order-1 lg:order-2">
+              <Card className="lg:sticky lg:top-4">
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <ShoppingCart size={20} />

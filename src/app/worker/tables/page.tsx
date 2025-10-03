@@ -152,8 +152,22 @@ export default function WorkerTablesPage() {
     const consumptionAmount = rentalSales.reduce((sum, s) => sum + Number(s.total_amount), 0);
     const totalAmount = rentalAmount + consumptionAmount;
 
-    // Preguntar si el cliente pagó
-    const isPaid = confirm(`Total a pagar: S/ ${totalAmount.toFixed(2)}\n\n¿El cliente pagó la cuenta completa?`);
+    // Verificar si es cliente anónimo
+    const isAnonymousClient = !endingRental.clients?.name || endingRental.clients.name === 'Cliente Anónimo';
+
+    let isPaid;
+    if (isAnonymousClient) {
+      // Para clientes anónimos, forzar pago inmediato
+      isPaid = confirm(`Cliente Anónimo - PAGO OBLIGATORIO\n\nTotal a pagar: S/ ${totalAmount.toFixed(2)}\n\n⚠️ Los clientes anónimos deben pagar inmediatamente.\n¿Confirmas que el cliente pagó la cuenta completa?`);
+      
+      if (!isPaid) {
+        alert('❌ No se puede finalizar la renta sin pago para clientes anónimos.');
+        return;
+      }
+    } else {
+      // Para clientes registrados, permitir fiado
+      isPaid = confirm(`Cliente: ${endingRental.clients?.name}\nTotal a pagar: S/ ${totalAmount.toFixed(2)}\n\n¿El cliente pagó la cuenta completa?\n(Cancelar = Fiado permitido)`);
+    }
 
     try {
       // Buscar table_id de la renta
@@ -347,6 +361,16 @@ export default function WorkerTablesPage() {
               <p className="text-xs text-muted-foreground mt-2">
                 Si no seleccionas un cliente, la renta será anónima. Puedes crear clientes desde <a href="/worker/clients" className="underline">Clientes</a>.
               </p>
+              {!selectedClientId && (
+                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 font-medium">
+                    ⚠️ Cliente Anónimo - Solo Pago Inmediato
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Los clientes anónimos deben pagar al finalizar la renta. No se permite fiado.
+                  </p>
+                </div>
+              )}
             </div>
 
             <DialogFooter>

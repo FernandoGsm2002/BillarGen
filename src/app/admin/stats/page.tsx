@@ -6,7 +6,9 @@ import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { TrendingUp, DollarSign, ShoppingCart, Clock, Users, Package } from 'lucide-react';
+import { TrendingUp, DollarSign, ShoppingCart, Clock, Users, Package, Calendar, Activity, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface Stats24h {
   totalSales: number;
@@ -16,6 +18,41 @@ interface Stats24h {
   topProducts: Array<{ name: string; quantity: number; total: number }>;
   topWorkers: Array<{ username: string; sales: number; total: number }>;
   hourlyData: Array<{ hour: number; sales: number; amount: number }>;
+}
+
+interface SessionData {
+  id: number;
+  session_name: string;
+  start_time: string;
+  end_time: string | null;
+  is_active: boolean;
+  total_sales_revenue: number;
+  total_rentals_revenue: number;
+  total_revenue: number;
+  products_sold: number;
+  rentals_completed: number;
+  duration: string;
+}
+
+interface SessionDetail {
+  session: SessionData;
+  sales: Array<{
+    id: number;
+    quantity: number;
+    total_amount: number;
+    created_at: string;
+    products: { name: string } | null;
+    clients: { name: string } | null;
+    users: { username: string } | null;
+  }>;
+  rentals: Array<{
+    id: number;
+    total_amount: number;
+    start_time: string;
+    end_time: string;
+    clients: { name: string } | null;
+    tables: { name: string } | null;
+  }>;
 }
 
 export default function StatsPage() {
@@ -30,7 +67,10 @@ export default function StatsPage() {
     topWorkers: [],
     hourlyData: []
   });
+  const [sessions, setSessions] = useState<SessionData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null);
+  const [showSessionDetail, setShowSessionDetail] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -47,6 +87,7 @@ export default function StatsPage() {
 
     setUser(parsedUser);
     loadStats(parsedUser.tenant_id);
+    loadSessions(parsedUser.tenant_id);
   }, [router]);
 
   const loadStats = async (tenantId: number) => {
@@ -130,6 +171,134 @@ export default function StatsPage() {
     }
 
     setLoading(false);
+  };
+
+  const loadSessions = async (tenantId: number) => {
+    try {
+      // Obtener sesiones de los últimos 30 días
+      const last30Days = new Date();
+      last30Days.setDate(last30Days.getDate() - 30);
+
+      const { data: sessionsData } = await supabase
+        .from('daily_sessions')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .gte('start_time', last30Days.toISOString())
+        .order('start_time', { ascending: false });
+
+      if (sessionsData) {
+        // Calcular datos financieros para cada sesión
+        const sessionsWithFinancials = await Promise.all(
+          sessionsData.map(async (session) => {
+            const sessionEndTime = session.end_time || new Date().toISOString();
+
+            // Obtener ventas de la sesión
+            const { data: salesData } = await supabase
+              .from('sales')
+              .select('total_amount, quantity')
+              .eq('tenant_id', tenantId)
+              .gte('created_at', session.start_time)
+              .lt('created_at', sessionEndTime);
+
+            // Obtener rentas de la sesión
+            const { data: rentalsData } = await supabase
+              .from('rentals')
+              .select('total_amount')
+              .eq('tenant_id', tenantId)
+              .gte('start_time', session.start_time)
+              .not('end_time', 'is', null)
+              .lte('end_time', sessionEndTime);
+
+            const total_sales_revenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0) || 0;
+            const total_rentals_revenue = rentalsData?.reduce((sum, rental) => sum + Number(rental.total_amount || 0), 0) || 0;
+            const total_revenue = total_sales_revenue + total_rentals_revenue;
+            const products_sold = salesData?.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0) || 0;
+            const rentals_completed = rentalsData?.length || 0;
+
+            // Calcular duración
+            const startTime = new Date(session.start_time);
+            const endTime = new Date(sessionEndTime);
+            const durationMs = endTime.getTime() - startTime.getTime();
+            const hours = Math.floor(durationMs / (1000 * 60 * 60));
+            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+            const duration = `${hours}h ${minutes}m`;
+
+            return {
+              ...session,
+              total_sales_revenue,
+              total_rentals_revenue,
+              total_revenue,
+              products_sold,
+              rentals_completed,
+              duration
+            };
+          })
+        );
+
+        setSessions(sessionsWithFinancials);
+      }
+    } catch (error) {
+      console.error('Error cargando sesiones:', error);
+    }
+  };
+
+  const loadSessionDetail = async (session: SessionData) => {
+    try {
+      const sessionEndTime = session.end_time || new Date().toISOString();
+
+      // Obtener ventas detalladas de la sesión
+      const { data: salesData } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          quantity,
+          total_amount,
+          created_at,
+          products(name),
+          clients(name),
+          users(username)
+        `)
+        .eq('tenant_id', user?.tenant_id)
+        .gte('created_at', session.start_time)
+        .lt('created_at', sessionEndTime);
+
+      // Obtener rentas detalladas de la sesión
+      const { data: rentalsData } = await supabase
+        .from('rentals')
+        .select(`
+          id,
+          total_amount,
+          start_time,
+          end_time,
+          clients(name),
+          tables(name)
+        `)
+        .eq('tenant_id', user?.tenant_id)
+        .gte('start_time', session.start_time)
+        .not('end_time', 'is', null)
+        .lte('end_time', sessionEndTime);
+
+      const sessionDetail: SessionDetail = {
+        session,
+        sales: (salesData || []).map(sale => ({
+          ...sale,
+          products: Array.isArray(sale.products) ? sale.products[0] : sale.products,
+          clients: Array.isArray(sale.clients) ? sale.clients[0] : sale.clients,
+          users: Array.isArray(sale.users) ? sale.users[0] : sale.users
+        })),
+        rentals: (rentalsData || []).map(rental => ({
+          ...rental,
+          clients: Array.isArray(rental.clients) ? rental.clients[0] : rental.clients,
+          tables: Array.isArray(rental.tables) ? rental.tables[0] : rental.tables
+        }))
+      };
+
+      setSelectedSession(sessionDetail);
+      setShowSessionDetail(true);
+    } catch (error) {
+      console.error('Error cargando detalle de sesión:', error);
+      alert('Error al cargar los detalles de la sesión');
+    }
   };
 
   if (!user) {
@@ -312,11 +481,279 @@ export default function StatsPage() {
                   </CardBody>
                 </Card>
               )}
+
+              {/* Historial de Sesiones */}
+              <Card className="mt-8">
+                <CardHeader accent="emerald">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Activity size={24} className="text-green-600" />
+                    Historial de Sesiones (Últimos 30 días)
+                  </h2>
+                </CardHeader>
+                <CardBody>
+                  {sessions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <div className="min-w-full">
+                        <div className="grid grid-cols-1 gap-4 md:hidden">
+                          {/* Vista móvil - Cards */}
+                          {sessions.map((session) => (
+                            <div key={session.id} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-900">{session.session_name}</h3>
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  session.is_active 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {session.is_active ? 'Activa' : 'Finalizada'}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <span className="text-gray-600">Inicio:</span>
+                                  <p className="font-medium">{new Date(session.start_time).toLocaleString('es-PE')}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Duración:</span>
+                                  <p className="font-medium">{session.duration}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Ingresos:</span>
+                                  <p className="font-bold text-green-600">S/ {session.total_revenue.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Productos:</span>
+                                  <p className="font-medium">{session.products_sold}</p>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => loadSessionDetail(session)}
+                                className="flex items-center gap-1 w-full mt-3"
+                              >
+                                <Eye size={14} />
+                                Ver Detalle
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Vista desktop - Tabla */}
+                        <div className="hidden md:block">
+                          <table className="min-w-full">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Sesión</th>
+                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Fecha/Hora</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Duración</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Ventas</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Rentas</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Total</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Productos</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
+                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {sessions.map((session) => (
+                                <tr key={session.id} className="hover:bg-gray-50">
+                                  <td className="py-3 px-4">
+                                    <div className="font-medium text-gray-900">{session.session_name}</div>
+                                  </td>
+                                  <td className="py-3 px-4 text-sm text-gray-600">
+                                    {new Date(session.start_time).toLocaleString('es-PE')}
+                                  </td>
+                                  <td className="py-3 px-4 text-center text-sm font-medium">
+                                    {session.duration}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-semibold text-green-600">
+                                    S/ {session.total_sales_revenue.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-semibold text-blue-600">
+                                    S/ {session.total_rentals_revenue.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-bold text-purple-600">
+                                    S/ {session.total_revenue.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-medium">
+                                    {session.products_sold}
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                      session.is_active 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {session.is_active ? 'Activa' : 'Finalizada'}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => loadSessionDetail(session)}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <Eye size={14} />
+                                      Ver Detalle
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay sesiones registradas</h3>
+                      <p className="text-gray-600">Las sesiones aparecerán aquí cuando comiences a usar el sistema de control de sesiones en Productos.</p>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
             </>
           )}
         </div>
       </div>
       </div>
+
+      {/* Modal Detalle de Sesión */}
+      <Dialog open={showSessionDetail} onOpenChange={setShowSessionDetail}>
+        <DialogContent className="!max-w-6xl max-h-[90vh] overflow-hidden flex flex-col mx-2 sm:mx-4 md:mx-6">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Activity size={24} />
+              Detalle de Sesión: {selectedSession?.session.session_name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedSession && (
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+              {/* Resumen de la Sesión */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Duración</p>
+                    <p className="text-lg font-bold text-blue-600">{selectedSession.session.duration}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Ingresos Totales</p>
+                    <p className="text-lg font-bold text-green-600">S/ {selectedSession.session.total_revenue.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Productos Vendidos</p>
+                    <p className="text-lg font-bold text-purple-600">{selectedSession.session.products_sold}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Mesas Rentadas</p>
+                    <p className="text-lg font-bold text-orange-600">{selectedSession.session.rentals_completed}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Ventas Detalladas */}
+                <div className="bg-white border rounded-lg">
+                  <div className="p-4 border-b bg-green-50">
+                    <h3 className="text-lg font-bold text-green-800 flex items-center gap-2">
+                      <ShoppingCart size={20} />
+                      Ventas de Productos ({selectedSession.sales.length})
+                    </h3>
+                    <p className="text-sm text-green-600">Total: S/ {selectedSession.session.total_sales_revenue.toFixed(2)}</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {selectedSession.sales.length > 0 ? (
+                      <div className="divide-y">
+                        {selectedSession.sales.map((sale) => (
+                          <div key={sale.id} className="p-4 hover:bg-gray-50">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-semibold text-gray-900">{sale.products?.name || 'Producto N/A'}</p>
+                                <p className="text-sm text-gray-600">Cantidad: {sale.quantity}</p>
+                              </div>
+                              <p className="font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</p>
+                            </div>
+                            <div className="text-xs text-gray-500 space-y-1">
+                              <p>Cliente: {sale.clients?.name || 'Cliente Anónimo'}</p>
+                              <p>Vendedor: {sale.users?.username || 'N/A'}</p>
+                              <p>Fecha: {new Date(sale.created_at).toLocaleString('es-PE')}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-gray-500">
+                        <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
+                        <p>No hay ventas registradas en esta sesión</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Rentas Detalladas */}
+                <div className="bg-white border rounded-lg">
+                  <div className="p-4 border-b bg-blue-50">
+                    <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2">
+                      <Clock size={20} />
+                      Rentas de Mesas ({selectedSession.rentals.length})
+                    </h3>
+                    <p className="text-sm text-blue-600">Total: S/ {selectedSession.session.total_rentals_revenue.toFixed(2)}</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {selectedSession.rentals.length > 0 ? (
+                      <div className="divide-y">
+                        {selectedSession.rentals.map((rental) => (
+                          <div key={rental.id} className="p-4 hover:bg-gray-50">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-semibold text-gray-900">{rental.tables?.name || 'Mesa N/A'}</p>
+                                <p className="text-sm text-gray-600">
+                                  Duración: {(() => {
+                                    const start = new Date(rental.start_time);
+                                    const end = new Date(rental.end_time);
+                                    const diffMs = end.getTime() - start.getTime();
+                                    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                                    return `${hours}h ${minutes}m`;
+                                  })()}
+                                </p>
+                              </div>
+                              <p className="font-bold text-blue-600">S/ {Number(rental.total_amount).toFixed(2)}</p>
+                            </div>
+                            <div className="text-xs text-gray-500 space-y-1">
+                              <p>Cliente: {rental.clients?.name || 'Cliente Anónimo'}</p>
+                              <p>Inicio: {new Date(rental.start_time).toLocaleString('es-PE')}</p>
+                              <p>Fin: {new Date(rental.end_time).toLocaleString('es-PE')}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-gray-500">
+                        <Clock size={48} className="mx-auto mb-4 text-gray-300" />
+                        <p>No hay rentas registradas en esta sesión</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowSessionDetail(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }
