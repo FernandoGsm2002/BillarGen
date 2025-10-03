@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { StatCard, Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Package, TrendingUp, AlertTriangle, DollarSign, Users } from 'lucide-react';
@@ -92,6 +92,7 @@ export default function AdminDashboard() {
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
             <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
               <div className="p-4 bg-muted rounded-xl">
                 <TrendingUp size={32} />
               </div>

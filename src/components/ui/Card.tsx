@@ -97,7 +97,7 @@ export function StatCard({ title, value, subtitle, icon, accent = 'slate', class
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">{title}</h3>
-            <p className={`text-4xl md:text-5xl font-bold ${textColor} truncate`}>{value}</p>
+            <p className={`text-2xl md:text-3xl font-bold ${textColor} truncate`}>{value}</p>
             {subtitle && <p className="text-sm text-muted-foreground mt-3 font-medium">{subtitle}</p>}
           </div>
           {icon && (

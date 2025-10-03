@@ -4,14 +4,14 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardBody, StatCard } from '@/components/ui/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { UserCheck, DollarSign, AlertCircle, Search, Eye, Package, Calendar } from 'lucide-react';
+import { UserCheck, DollarSign, AlertCircle, Search, Eye, Package, Calendar, Plus } from 'lucide-react';
 
 interface ClientWithDebt {
   id: number;
@@ -32,6 +32,10 @@ export default function ClientsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<ClientWithDebt | null>(null);
   const [clientSales, setClientSales] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; created_at: string; quantity: number; products?: { name: string }; rentals?: { id: number; tables?: { name: string } } }>>([]);
+  const [clientRentals, setClientRentals] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; end_time: string; tables?: { name: string } }>>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ name: '', phone: '', email: '' });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -111,12 +115,84 @@ export default function ClientsPage() {
 
   const handleViewDetails = async (client: ClientWithDebt) => {
     setSelectedClient(client);
-    const { data } = await supabase
+    
+    // Cargar ventas del cliente
+    const { data: salesData } = await supabase
       .from('sales')
       .select('*, products(name), rentals(id, tables(name))')
       .eq('client_id', client.id)
       .order('created_at', { ascending: false });
-    setClientSales(data || []);
+    
+    // Cargar rentas del cliente
+    const { data: rentalsData } = await supabase
+      .from('rentals')
+      .select('*, tables(name)')
+      .eq('client_id', client.id)
+      .not('end_time', 'is', null)
+      .order('end_time', { ascending: false });
+    
+    setClientSales(salesData || []);
+    setClientRentals(rentalsData || []);
+  };
+
+  const handleMarkAsPaid = async (saleId: number) => {
+    if (!confirm('¿Marcar esta venta como pagada?')) return;
+    
+    await supabase
+      .from('sales')
+      .update({ is_paid: true })
+      .eq('id', saleId);
+    
+    // Recargar datos del cliente
+    if (selectedClient) {
+      handleViewDetails(selectedClient);
+      if (user) loadClients(user.tenant_id);
+    }
+  };
+
+  const handleMarkRentalAsPaid = async (rentalId: number) => {
+    if (!confirm('¿Marcar esta renta como pagada?')) return;
+    
+    // Marcar la renta como pagada
+    await supabase
+      .from('rentals')
+      .update({ is_paid: true })
+      .eq('id', rentalId);
+    
+    // También marcar las ventas asociadas como pagadas
+    await supabase
+      .from('sales')
+      .update({ is_paid: true })
+      .eq('rental_id', rentalId);
+    
+    // Recargar datos del cliente
+    if (selectedClient) {
+      handleViewDetails(selectedClient);
+      if (user) loadClients(user.tenant_id);
+    }
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setCreating(true);
+    try {
+      await supabase.from('clients').insert([{
+        tenant_id: user.tenant_id,
+        name: form.name.trim(),
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null
+      }]);
+      setForm({ name: '', phone: '', email: '' });
+      setShowCreateModal(false);
+      loadClients(user.tenant_id);
+    } catch (err) {
+      console.error(err);
+      alert('Error al crear cliente');
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (!user) {
@@ -145,6 +221,7 @@ export default function ClientsPage() {
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
             <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
               <div className="p-4 bg-muted rounded-xl">
                 <UserCheck size={32} />
               </div>
@@ -202,19 +279,27 @@ export default function ClientsPage() {
             </div>
           </div>
 
-          {/* Filtros */}
-          <div className="mb-6 flex gap-3">
+          {/* Filtros y Acciones */}
+          <div className="mb-6 flex justify-between items-center">
+            <div className="flex gap-3">
+              <Button
+                variant={filter === 'all' ? 'default' : 'ghost'}
+                onClick={() => setFilter('all')}
+              >
+                Todos ({clients.length})
+              </Button>
+              <Button
+                variant={filter === 'with_debt' ? 'secondary' : 'ghost'}
+                onClick={() => setFilter('with_debt')}
+              >
+                Con Deudas ({clientsWithDebt})
+              </Button>
+            </div>
             <Button
-              variant={filter === 'all' ? 'default' : 'ghost'}
-              onClick={() => setFilter('all')}
+              variant="default"
+              onClick={() => setShowCreateModal(true)}
             >
-              Todos ({clients.length})
-            </Button>
-            <Button
-              variant={filter === 'with_debt' ? 'secondary' : 'ghost'}
-              onClick={() => setFilter('with_debt')}
-            >
-              Con Deudas ({clientsWithDebt})
+              <Plus size={20} className="mr-2" /> Crear Cliente
             </Button>
           </div>
 
@@ -293,9 +378,9 @@ export default function ClientsPage() {
       </div>
       </div>
 
-      {/* Modal de Detalles del Cliente */}
-      <Dialog open={selectedClient !== null} onOpenChange={(open) => !open && setSelectedClient(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      {/* Modal Detalles Cliente */}
+      <Dialog open={selectedClient !== null} onOpenChange={() => setSelectedClient(null)}>
+        <DialogContent className="!max-w-6xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
               Historial de Ventas - {selectedClient?.name}
@@ -319,8 +404,54 @@ export default function ClientsPage() {
               </div>
             </div>
 
+            {/* Tabla de Rentas */}
+            {clientRentals.length > 0 && (
+              <div className="border rounded-lg overflow-hidden mb-4">
+                <div className="bg-blue-50 px-4 py-2 border-b">
+                  <h3 className="font-bold text-blue-900">Alquileres de Mesas</h3>
+                </div>
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {clientRentals.map((rental) => (
+                      <tr key={rental.id} className="hover:bg-muted/30">
+                        <td className="px-4 py-3 font-medium">{rental.tables?.name || 'N/A'}</td>
+                        <td className="px-4 py-3 font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={rental.is_paid ? 'success' : 'danger'} className="text-xs">
+                            {rental.is_paid ? 'Pagado' : 'Pendiente'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                          {new Date(rental.end_time).toLocaleDateString('es-PE')}
+                        </td>
+                        <td className="px-4 py-3">
+                          {!rental.is_paid && (
+                            <Button size="sm" variant="outline" onClick={() => handleMarkRentalAsPaid(rental.id)}>
+                              Marcar Pagado
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* Tabla de Ventas */}
             <div className="border rounded-lg overflow-hidden">
+              <div className="bg-green-50 px-4 py-2 border-b">
+                <h3 className="font-bold text-green-900">Productos Vendidos</h3>
+              </div>
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
@@ -330,6 +461,7 @@ export default function ClientsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -357,6 +489,13 @@ export default function ClientsPage() {
                           {new Date(sale.created_at).toLocaleDateString('es-PE')}
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        {!sale.is_paid && (
+                          <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(sale.id)}>
+                            Marcar Pagado
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -369,6 +508,55 @@ export default function ClientsPage() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Crear Cliente */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Cliente</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateClient} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Nombre *</label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Nombre del cliente"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Teléfono</label>
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="999 999 999"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Email</label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="cliente@ejemplo.com"
+              />
+            </div>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? 'Creando...' : 'Crear Cliente'}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </SidebarProvider>

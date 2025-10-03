@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Table } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Plus } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -140,6 +140,7 @@ export default function TablesPage() {
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
             <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
               <div className="p-4 bg-muted rounded-xl">
                 <Image src="/icons/mesa.ico" alt="Mesa" width={32} height={32} />
               </div>

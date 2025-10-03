@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatCard, Card, CardBody } from '@/components/ui/Card';
@@ -95,6 +95,7 @@ export default function WorkersPage() {
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
             <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
               <div className="p-4 bg-muted rounded-xl">
                 <UsersIcon size={32} />
               </div>

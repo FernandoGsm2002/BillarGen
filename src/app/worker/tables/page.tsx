@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, Client } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -88,18 +88,14 @@ export default function WorkerTablesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedTable) return;
-    if (!selectedClientId) {
-      alert('Selecciona un cliente existente. Puedes crear uno en el panel de Clientes.');
-      return;
-    }
 
     try {
-      // Crear renta
+      // Crear renta (client_id puede ser NULL para clientes anónimos)
       await supabase
         .from('rentals')
         .insert([{
           tenant_id: user.tenant_id,
-          client_id: selectedClientId,
+          client_id: selectedClientId || null,
           table_id: selectedTable.id,
           start_time: new Date().toISOString()
         }]);
@@ -156,8 +152,10 @@ export default function WorkerTablesPage() {
     const consumptionAmount = rentalSales.reduce((sum, s) => sum + Number(s.total_amount), 0);
     const totalAmount = rentalAmount + consumptionAmount;
 
-    try {
+    // Preguntar si el cliente pagó
+    const isPaid = confirm(`Total a pagar: S/ ${totalAmount.toFixed(2)}\n\n¿El cliente pagó la cuenta completa?`);
 
+    try {
       // Buscar table_id de la renta
       const { data: rentalData } = await supabase
         .from('rentals')
@@ -165,20 +163,21 @@ export default function WorkerTablesPage() {
         .eq('id', endingRental.id)
         .single();
 
-      // Actualizar renta
+      // Actualizar renta con estado de pago (solo el monto de la renta, sin consumo)
       await supabase
         .from('rentals')
         .update({
           end_time: new Date().toISOString(),
-          total_amount: totalAmount
+          total_amount: rentalAmount,
+          is_paid: isPaid
         })
         .eq('id', endingRental.id);
 
-      // Marcar ventas como pagadas
+      // Marcar ventas según el pago
       if (rentalSales.length > 0) {
         await supabase
           .from('sales')
-          .update({ is_paid: true })
+          .update({ is_paid: isPaid })
           .eq('rental_id', endingRental.id);
       }
 
@@ -190,10 +189,15 @@ export default function WorkerTablesPage() {
           .eq('id', rentalData.table_id);
       }
 
-      alert('Renta finalizada exitosamente');
       setEndingRental(null);
       setRentalSales([]);
-      loadData(user.tenant_id);
+      
+      // Recargar datos después de un pequeño delay para asegurar que la DB se actualizó
+      setTimeout(() => {
+        loadData(user.tenant_id);
+      }, 500);
+      
+      alert(isPaid ? 'Renta finalizada y pagada' : 'Renta finalizada - Deuda registrada');
     } catch (error) {
       console.error('Error:', error);
       alert('Error al finalizar renta');
@@ -213,6 +217,7 @@ export default function WorkerTablesPage() {
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
             <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
               <div className="p-4 bg-muted rounded-xl">
                 <Image src="/icons/mesa.ico" alt="Mesa" width={32} height={32} />
               </div>
@@ -333,15 +338,14 @@ export default function WorkerTablesPage() {
                 value={selectedClientId ?? ''}
                 onChange={(e) => setSelectedClientId(e.target.value ? Number(e.target.value) : null)}
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
               >
-                <option value="" disabled>Elige un cliente existente</option>
+                <option value="">Cliente Anónimo (Sin registrar)</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.phone ? ` - ${c.phone}` : ''}</option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground mt-2">
-                ¿No encuentras al cliente? Créalo desde <a href="/worker/clients" className="underline">Clientes</a>.
+                Si no seleccionas un cliente, la renta será anónima. Puedes crear clientes desde <a href="/worker/clients" className="underline">Clientes</a>.
               </p>
             </div>
 

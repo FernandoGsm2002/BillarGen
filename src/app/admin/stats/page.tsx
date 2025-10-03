@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { TrendingUp, DollarSign, ShoppingCart, Clock, Users, Package } from 'lucide-react';
 
@@ -144,7 +144,10 @@ export default function StatsPage() {
       <div className="flex-1 overflow-auto">
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-            <h1 className="text-3xl font-bold">📊 Estadísticas</h1>
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
+              <h1 className="text-3xl font-bold">📊 Estadísticas</h1>
+            </div>
             <p className="text-base text-muted-foreground mt-1">Últimas 24 horas</p>
           </div>
         </div>

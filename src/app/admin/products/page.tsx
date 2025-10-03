@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Product } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import ProductCard from '@/components/ProductCard';
 import { StatCard, Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
-import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X } from 'lucide-react';
+import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X, BarChart3, Calendar } from 'lucide-react';
 import Image from 'next/image';
 
 const AVAILABLE_IMAGES = [
@@ -38,8 +38,17 @@ export default function ProductsPage() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [stockReport, setStockReport] = useState<Array<{
+    product: Product;
+    initial_stock: number;
+    current_stock: number;
+    sold_today: number;
+    difference: number;
+    has_snapshot: boolean;
+  }>>([]);
   const [formData, setFormData] = useState({ 
     name: '', 
     price: '', 
@@ -153,6 +162,84 @@ export default function ProductsPage() {
     if (user) loadProducts(user.tenant_id);
   };
 
+  const saveInitialStock = async () => {
+    console.log('Guardando stock inicial...');
+    if (!user) return;
+    
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Guardar el stock inicial de todos los productos para hoy
+    const stockSnapshots = products.map(product => ({
+      tenant_id: user.tenant_id,
+      product_id: product.id,
+      date: today,
+      initial_stock: product.stock
+    }));
+
+    try {
+      await supabase
+        .from('daily_stock_snapshots')
+        .upsert(stockSnapshots, { 
+          onConflict: 'tenant_id,product_id,date',
+          ignoreDuplicates: false 
+        });
+      
+      alert('Stock inicial del día guardado correctamente');
+    } catch (error) {
+      console.error('Error guardando stock inicial:', error);
+      alert('Error al guardar stock inicial');
+    }
+  };
+
+  const generateStockReport = async () => {
+    console.log('Generando reporte de stock...');
+    if (!user) return;
+    
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+
+    const report = await Promise.all(
+      products.map(async (product) => {
+        // Obtener stock inicial guardado para hoy
+        const { data: snapshotData } = await supabase
+          .from('daily_stock_snapshots')
+          .select('initial_stock')
+          .eq('tenant_id', user.tenant_id)
+          .eq('product_id', product.id)
+          .eq('date', todayStr)
+          .single();
+
+        // Obtener ventas del día de hoy para este producto
+        const { data: salesData } = await supabase
+          .from('sales')
+          .select('quantity')
+          .eq('product_id', product.id)
+          .gte('created_at', startOfDay)
+          .lt('created_at', endOfDay);
+
+        const sold_today = salesData?.reduce((sum, sale) => sum + sale.quantity, 0) || 0;
+        const current_stock = product.stock;
+        const initial_stock = snapshotData?.initial_stock || current_stock + sold_today; // Fallback si no hay snapshot
+        const expected_stock = initial_stock - sold_today;
+        const difference = current_stock - expected_stock;
+
+        return {
+          product,
+          initial_stock,
+          current_stock,
+          sold_today,
+          difference,
+          has_snapshot: !!snapshotData
+        };
+      })
+    );
+
+    setStockReport(report);
+    setShowStockModal(true);
+  };
+
   if (!user) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
@@ -168,6 +255,7 @@ export default function ProductsPage() {
       <div className="flex-1 overflow-auto">
         <div className="bg-card border-b">
           <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 flex items-center gap-4">
+            <SidebarTrigger className="md:hidden" />
             <div className="p-4 bg-muted rounded-xl">
               <PackageIcon size={32} />
             </div>
@@ -241,22 +329,38 @@ export default function ProductsPage() {
               </Button>
             </div>
 
-            <Button
-              variant="default"
-              size="lg"
-              onClick={() => {
-                setEditingProduct(null);
-                setFormData({ name: '', price: '', stock: '0', image_url: '/pngs/pilsen.png' });
-                setShowModal(true);
-              }}
-            >
-              <Plus size={20} className="mr-2" /> Agregar Producto
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={saveInitialStock}
+              >
+                <Calendar size={20} className="mr-2" /> Guardar Stock del Día
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={generateStockReport}
+              >
+                <BarChart3 size={20} className="mr-2" /> Reporte Stock Diario
+              </Button>
+              <Button
+                variant="default"
+                size="lg"
+                onClick={() => {
+                  setEditingProduct(null);
+                  setFormData({ name: '', price: '', stock: '0', image_url: '/pngs/pilsen.png' });
+                  setShowModal(true);
+                }}
+              >
+                <Plus size={20} className="mr-2" /> Agregar Producto
+              </Button>
+            </div>
           </div>
 
           {/* Products Grid */}
           {viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
               {filteredProducts.map((product) => (
                 <div key={product.id} className="relative group">
                   <ProductCard
@@ -392,7 +496,7 @@ export default function ProductsPage() {
 
       {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingProduct ? 'Editar Producto' : 'Agregar Producto'}
@@ -437,30 +541,30 @@ export default function ProductsPage() {
             <label className="block text-sm font-bold text-gray-800 mb-2">
               Imagen del Producto
             </label>
-            <div className="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto p-2">
+            <div className="grid grid-cols-3 gap-4 max-h-[500px] overflow-y-auto p-2">
               {AVAILABLE_IMAGES.map((img) => (
                 <button
                   key={img.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, image_url: img.value })}
                   className={`
-                    relative aspect-square rounded-lg overflow-hidden border-4 transition-all bg-white p-2
+                    relative rounded-lg overflow-hidden border-4 transition-all bg-white p-4 flex flex-col items-center gap-3
                     ${formData.image_url === img.value 
                       ? 'border-indigo-600 scale-105 shadow-lg' 
                       : 'border-gray-200 hover:border-indigo-300'
                     }
                   `}
                 >
-                  <div className="relative w-full h-full">
+                  <div className="relative w-full h-40">
                     <Image
                       src={img.value}
                       alt={img.label}
                       fill
                       className="object-contain"
-                      sizes="150px"
+                      sizes="200px"
                     />
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-gray-900 text-xs py-1 text-center font-bold border-t border-gray-200">
+                  <div className="text-gray-900 text-sm text-center font-bold">
                     {img.label}
                   </div>
                 </button>
@@ -484,6 +588,141 @@ export default function ProductsPage() {
             </Button>
           </DialogFooter>
         </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Reporte Stock Diario */}
+      <Dialog open={showStockModal} onOpenChange={setShowStockModal}>
+        <DialogContent className="!max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar size={24} />
+              Reporte de Stock Diario - {new Date().toLocaleDateString('es-PE')}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Este reporte compara el stock inicial guardado vs el stock actual, considerando las ventas del día.
+              {stockReport.some(item => !item.has_snapshot) && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800">
+                  ⚠️ Algunos productos no tienen stock inicial guardado para hoy. Se usa estimación basada en ventas.
+                </div>
+              )}
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead className="text-center">Stock Inicial</TableHead>
+                  <TableHead className="text-center">Vendido Hoy</TableHead>
+                  <TableHead className="text-center">Stock Actual</TableHead>
+                  <TableHead className="text-center">Diferencia</TableHead>
+                  <TableHead className="text-center">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stockReport.map((item) => (
+                  <TableRow key={item.product.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
+                          {item.product.image_url ? (
+                            <Image
+                              src={item.product.image_url}
+                              alt={item.product.name}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full">
+                              <PackageIcon size={20} className="text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-medium">{item.product.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="font-semibold text-blue-600">{item.initial_stock}</span>
+                        {!item.has_snapshot && (
+                          <span className="text-xs text-amber-600" title="Estimado - No hay stock inicial guardado">*</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="font-semibold text-orange-600">{item.sold_today}</span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="font-semibold text-green-600">{item.current_stock}</span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`font-bold ${
+                        item.difference === 0 ? 'text-green-600' :
+                        item.difference < 0 ? 'text-red-600' : 'text-blue-600'
+                      }`}>
+                        {item.difference > 0 ? '+' : ''}{item.difference}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        item.difference === 0 
+                          ? 'bg-green-100 text-green-800' 
+                          : item.difference < 0 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {item.difference === 0 ? 'Correcto' : 
+                         item.difference < 0 ? 'Faltante' : 'Sobrante'}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {stockReport.length === 0 && (
+              <div className="text-center py-8">
+                <BarChart3 size={48} className="mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay datos para mostrar</h3>
+                <p className="text-gray-600">Asegúrate de tener productos registrados para generar el reporte.</p>
+              </div>
+            )}
+
+            <div className="bg-muted p-4 rounded-lg">
+              <h4 className="font-semibold mb-2">Resumen del Día:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Total productos: </span>
+                  <span className="font-semibold">{stockReport.length}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total vendido hoy: </span>
+                  <span className="font-semibold text-orange-600">
+                    {stockReport.reduce((sum, item) => sum + item.sold_today, 0)} unidades
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Productos con diferencias: </span>
+                  <span className="font-semibold text-red-600">
+                    {stockReport.filter(item => item.difference !== 0).length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowStockModal(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       </div>

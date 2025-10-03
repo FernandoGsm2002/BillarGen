@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Product } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
@@ -84,11 +84,11 @@ export default function POSPage() {
     if (clientsData) setClients(clientsData);
     
     if (rentalsData) {
-      const formattedRentals = rentalsData.map((r: { id: number; client_id: number; clients?: { name?: string }[] | { name?: string }; tables?: { name?: string }[] | { name?: string } }) => ({
+      const formattedRentals = rentalsData.map((r: any) => ({
         id: r.id,
         client_id: r.client_id,
-        client_name: (Array.isArray(r.clients) ? r.clients[0]?.name : r.clients?.name) || 'Sin nombre',
-        table_name: (Array.isArray(r.tables) ? r.tables[0]?.name : r.tables?.name) || 'Mesa'
+        client_name: r.clients?.[0]?.name || r.clients?.name || 'Cliente Anónimo',
+        table_name: r.tables?.[0]?.name || r.tables?.name || 'Mesa'
       }));
       setRentals(formattedRentals);
     }
@@ -209,15 +209,14 @@ export default function POSPage() {
       
       <div className="flex-1 overflow-auto">
         <div className="bg-card border-b">
-          <div className="px-8 py-6">
-            <div className="flex items-center gap-4">
-              <div className="p-4 bg-muted rounded-xl">
-                <ShoppingCart size={32} />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">Punto de Venta</h1>
-                <p className="text-base text-muted-foreground mt-1">Registra ventas de productos</p>
-              </div>
+          <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 flex items-center gap-4">
+            <SidebarTrigger className="md:hidden" />
+            <div className="p-4 bg-muted rounded-xl">
+              <ShoppingCart size={32} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Punto de Venta</h1>
+              <p className="text-base text-muted-foreground mt-1">Vende productos</p>
             </div>
           </div>
         </div>

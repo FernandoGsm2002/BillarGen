@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { StatCard, Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -30,7 +30,8 @@ export default function WorkerClientsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '' });
   const [selectedClient, setSelectedClient] = useState<ClientWithDebt | null>(null);
-  const [clientSales, setClientSales] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; created_at: string; quantity: number; products?: { name: string }; rentals?: { id: number; tables?: { name: string } } }>>([]);
+  const [clientSales, setClientSales] = useState<any[]>([]);
+  const [clientRentals, setClientRentals] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; end_time: string; tables?: { name: string } }>>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -112,12 +113,57 @@ export default function WorkerClientsPage() {
 
   const handleViewDetails = async (client: ClientWithDebt) => {
     setSelectedClient(client);
-    const { data } = await supabase
+    
+    // Cargar ventas del cliente
+    const { data: salesData } = await supabase
       .from('sales')
       .select('*, products(name), rentals(id, tables(name))')
       .eq('client_id', client.id)
       .order('created_at', { ascending: false });
-    setClientSales(data || []);
+    
+    // Cargar rentas del cliente
+    const { data: rentalsData } = await supabase
+      .from('rentals')
+      .select('*, tables(name)')
+      .eq('client_id', client.id)
+      .not('end_time', 'is', null)
+      .order('end_time', { ascending: false });
+    
+    setClientSales(salesData || []);
+    setClientRentals(rentalsData || []);
+  };
+
+  const handleMarkAsPaid = async (saleId: number) => {
+    if (!confirm('¿Marcar esta venta como pagada?')) return;
+    
+    await supabase
+      .from('sales')
+      .update({ is_paid: true })
+      .eq('id', saleId);
+    
+    if (selectedClient) {
+      handleViewDetails(selectedClient);
+      if (user) loadClients(user.tenant_id);
+    }
+  };
+
+  const handleMarkRentalAsPaid = async (rentalId: number) => {
+    if (!confirm('¿Marcar esta renta como pagada?')) return;
+    
+    await supabase
+      .from('rentals')
+      .update({ is_paid: true })
+      .eq('id', rentalId);
+    
+    await supabase
+      .from('sales')
+      .update({ is_paid: true })
+      .eq('rental_id', rentalId);
+    
+    if (selectedClient) {
+      handleViewDetails(selectedClient);
+      if (user) loadClients(user.tenant_id);
+    }
   };
 
   if (!user) {
@@ -139,12 +185,14 @@ export default function WorkerClientsPage() {
         <div className="flex-1 overflow-auto">
           {/* Header */}
           <div className="bg-card border-b">
-            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">Clientes</h1>
-                <p className="text-muted-foreground mt-0.5 text-sm font-medium">Consulta y crea clientes</p>
+            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger className="md:hidden" />
+                <div>
+                  <h1 className="text-2xl font-bold">Clientes</h1>
+                  <p className="text-muted-foreground mt-0.5 text-sm font-medium">Consulta y crea clientes</p>
+                </div>
               </div>
-              <Button onClick={() => setShowModal(true)}>+ Nuevo Cliente</Button>
             </div>
           </div>
 
@@ -187,45 +235,9 @@ export default function WorkerClientsPage() {
         </div>
       </div>
 
-      {/* Modal Crear Cliente */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Cliente</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateClient} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">Nombre</label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Nombre completo"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">Teléfono (opcional)</label>
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="999 999 999"
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={creating}>
-                {creating ? 'Creando...' : 'Crear'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
       {/* Modal Detalles Cliente */}
       <Dialog open={selectedClient !== null} onOpenChange={(open) => !open && setSelectedClient(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="!max-w-6xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
               Historial - {selectedClient?.name}
