@@ -84,11 +84,11 @@ export default function POSPage() {
     if (clientsData) setClients(clientsData);
     
     if (rentalsData) {
-      const formattedRentals = rentalsData.map((r: any) => ({
+      const formattedRentals = rentalsData.map((r: { id: number; client_id: number; clients?: { name?: string }[] | { name?: string }; tables?: { name?: string }[] | { name?: string } }) => ({
         id: r.id,
         client_id: r.client_id,
-        client_name: r.clients?.[0]?.name || r.clients?.name || 'Sin nombre',
-        table_name: r.tables?.[0]?.name || r.tables?.name || 'Mesa'
+        client_name: (Array.isArray(r.clients) ? r.clients[0]?.name : r.clients?.name) || 'Sin nombre',
+        table_name: (Array.isArray(r.tables) ? r.tables[0]?.name : r.tables?.name) || 'Mesa'
       }));
       setRentals(formattedRentals);
     }

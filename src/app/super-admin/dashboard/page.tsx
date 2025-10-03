@@ -297,7 +297,7 @@ export default function SuperAdminDashboard() {
                     {admin.username}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {(admin as any).tenants?.name || `Tenant ${admin.tenant_id}`}
+                    {(admin as { tenants?: { name: string } }).tenants?.name || `Tenant ${admin.tenant_id}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(admin.created_at).toLocaleDateString()}

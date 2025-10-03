@@ -31,7 +31,7 @@ export default function WorkerTablesPage() {
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [endingRental, setEndingRental] = useState<RentalWithDetails | null>(null);
-  const [rentalSales, setRentalSales] = useState<any[]>([]);
+  const [rentalSales, setRentalSales] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; quantity: number; products?: { name: string } }>>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');

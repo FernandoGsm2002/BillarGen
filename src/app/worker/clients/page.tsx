@@ -30,7 +30,7 @@ export default function WorkerClientsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '' });
   const [selectedClient, setSelectedClient] = useState<ClientWithDebt | null>(null);
-  const [clientSales, setClientSales] = useState<any[]>([]);
+  const [clientSales, setClientSales] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; created_at: string; quantity: number; products?: { name: string }; rentals?: { id: number; tables?: { name: string } } }>>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');

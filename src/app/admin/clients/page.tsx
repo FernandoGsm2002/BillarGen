@@ -31,7 +31,7 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<ClientWithDebt | null>(null);
-  const [clientSales, setClientSales] = useState<any[]>([]);
+  const [clientSales, setClientSales] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; created_at: string; quantity: number; products?: { name: string }; rentals?: { id: number; tables?: { name: string } } }>>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
