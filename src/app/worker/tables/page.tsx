@@ -47,7 +47,7 @@ export default function WorkerTablesPage() {
     }
 
     setUser(parsedUser);
-    loadData(parsedUser.tenant_id);
+    loadData(parsedUser.tenant_id, parsedUser.id);
 
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -56,18 +56,25 @@ export default function WorkerTablesPage() {
     return () => clearInterval(timer);
   }, [router]);
 
-  const loadData = async (tenantId: number) => {
+  const loadData = async (tenantId: number, userId?: number) => {
     const { data: tablesData } = await supabase
       .from('tables')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('name', { ascending: true });
 
-    const { data: rentalsData } = await supabase
+    // Cargar solo las rentas activas del trabajador específico
+    let rentalsQuery = supabase
       .from('rentals')
       .select('*, clients(name, phone), tables(name, hourly_rate)')
       .eq('tenant_id', tenantId)
       .is('end_time', null);
+    
+    if (userId) {
+      rentalsQuery = rentalsQuery.eq('user_id', userId);
+    }
+    
+    const { data: rentalsData } = await rentalsQuery;
 
     const { data: clientsData } = await supabase
       .from('clients')
@@ -97,6 +104,7 @@ export default function WorkerTablesPage() {
           tenant_id: user.tenant_id,
           client_id: selectedClientId || null,
           table_id: selectedTable.id,
+          user_id: user.id,
           start_time: new Date().toISOString()
         }]);
 
@@ -109,7 +117,7 @@ export default function WorkerTablesPage() {
       setSelectedClientId(null);
       setShowModal(false);
       setSelectedTable(null);
-      loadData(user.tenant_id);
+      loadData(user.tenant_id, user.id);
     } catch (error) {
       console.error('Error:', error);
       alert('Error al iniciar renta');
@@ -208,7 +216,7 @@ export default function WorkerTablesPage() {
       
       // Recargar datos después de un pequeño delay para asegurar que la DB se actualizó
       setTimeout(() => {
-        loadData(user.tenant_id);
+        loadData(user.tenant_id, user.id);
       }, 500);
       
       alert(isPaid ? 'Renta finalizada y pagada' : 'Renta finalizada - Deuda registrada');

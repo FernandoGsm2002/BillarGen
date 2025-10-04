@@ -204,31 +204,86 @@ export default function WorkerClientsPage() {
             </div>
 
             <Card>
-              <CardBody>
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Cliente</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Contacto</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Deuda</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredClients.map((client) => (
-                      <tr key={client.id} className="border-b hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium">{client.name}</td>
-                        <td className="px-4 py-3 text-sm">{client.phone || '-'}</td>
-                        <td className="px-4 py-3 font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</td>
-                        <td className="px-4 py-3">
-                          <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)}>
-                            <Eye size={16} className="mr-1" /> Ver
+              <CardBody className="p-0">
+                {/* Vista móvil - Cards */}
+                <div className="md:hidden">
+                  {filteredClients.length > 0 ? (
+                    <div className="divide-y divide-gray-200">
+                      {filteredClients.map((client) => (
+                        <div key={client.id} className="p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                                <Users size={20} className="text-indigo-600" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-gray-900">{client.name}</div>
+                                <div className="text-xs text-gray-500">{client.phone || 'Sin teléfono'}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</div>
+                              <div className="text-xs text-gray-500">Deuda</div>
+                            </div>
+                          </div>
+                          
+                          <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)} className="w-full">
+                            <Eye size={16} className="mr-1" /> Ver Historial
                           </Button>
-                        </td>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Users size={48} className="mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
+                      <p className="text-gray-600">Los clientes aparecerán cuando realicen compras</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Vista desktop - Tabla */}
+                <div className="hidden md:block">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Cliente</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Contacto</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Deuda</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredClients.map((client) => (
+                        <tr key={client.id} className="border-b hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                <Users size={16} className="text-indigo-600" />
+                              </div>
+                              <span className="font-medium">{client.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm">{client.phone || '-'}</td>
+                          <td className="px-4 py-3 font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</td>
+                          <td className="px-4 py-3">
+                            <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)}>
+                              <Eye size={16} className="mr-1" /> Ver
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {filteredClients.length === 0 && (
+                    <div className="text-center py-12">
+                      <Users size={48} className="mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
+                      <p className="text-gray-600">Los clientes aparecerán cuando realicen compras</p>
+                    </div>
+                  )}
+                </div>
               </CardBody>
             </Card>
           </div>
@@ -237,9 +292,9 @@ export default function WorkerClientsPage() {
 
       {/* Modal Detalles Cliente */}
       <Dialog open={selectedClient !== null} onOpenChange={(open) => !open && setSelectedClient(null)}>
-        <DialogContent className="!max-w-6xl">
+        <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
+            <DialogTitle className="text-xl md:text-2xl">
               Historial - {selectedClient?.name}
             </DialogTitle>
           </DialogHeader>
@@ -260,49 +315,181 @@ export default function WorkerClientsPage() {
               </div>
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Producto</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Cant.</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {clientSales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Package size={16} className="text-muted-foreground" />
-                          <span className="font-medium text-sm">{sale.products?.name || 'N/A'}</span>
+            {/* Tabla de Rentas */}
+            {clientRentals.length > 0 && (
+              <div className="border rounded-lg overflow-hidden mb-4">
+                <div className="bg-blue-50 px-4 py-2 border-b">
+                  <h3 className="font-bold text-blue-900">Alquileres de Mesas</h3>
+                </div>
+                
+                {/* Vista móvil - Cards */}
+                <div className="md:hidden divide-y">
+                  {clientRentals.map((rental) => (
+                    <div key={rental.id} className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">{rental.tables?.name || 'N/A'}</p>
+                          <p className="text-sm text-gray-500">{new Date(rental.end_time).toLocaleDateString('es-PE')}</p>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{sale.rentals?.tables?.name || '-'}</td>
-                      <td className="px-4 py-3 font-semibold">{sale.quantity}</td>
-                      <td className="px-4 py-3 font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${sale.is_paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {sale.is_paid ? 'Pagado' : 'Fiado'}
+                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${rental.is_paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {rental.is_paid ? 'Pagado' : 'Pendiente'}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} />
-                          {new Date(sale.created_at).toLocaleDateString('es-PE')}
-                        </div>
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</p>
+                        {!rental.is_paid && (
+                          <Button size="sm" variant="outline" onClick={() => handleMarkRentalAsPaid(rental.id)}>
+                            Marcar Pagado
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-              {clientSales.length === 0 && (
+                </div>
+                
+                {/* Vista desktop - Tabla */}
+                <div className="hidden md:block">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {clientRentals.map((rental) => (
+                        <tr key={rental.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 font-medium">{rental.tables?.name || 'N/A'}</td>
+                          <td className="px-4 py-3 font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${rental.is_paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {rental.is_paid ? 'Pagado' : 'Pendiente'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {new Date(rental.end_time).toLocaleDateString('es-PE')}
+                          </td>
+                          <td className="px-4 py-3">
+                            {!rental.is_paid && (
+                              <Button size="sm" variant="outline" onClick={() => handleMarkRentalAsPaid(rental.id)}>
+                                Marcar Pagado
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Tabla de Ventas */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-green-50 px-4 py-2 border-b">
+                <h3 className="font-bold text-green-900">Productos Vendidos</h3>
+              </div>
+              
+              {clientSales.length > 0 ? (
+                <>
+                  {/* Vista móvil - Cards */}
+                  <div className="md:hidden divide-y">
+                    {clientSales.map((sale) => (
+                      <div key={sale.id} className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Package size={16} className="text-muted-foreground" />
+                            <div>
+                              <p className="font-medium text-gray-900">{sale.products?.name || 'N/A'}</p>
+                              <p className="text-sm text-gray-500">{sale.rentals?.tables?.name || 'Sin mesa'}</p>
+                            </div>
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${sale.is_paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {sale.is_paid ? 'Pagado' : 'Fiado'}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-600">Cantidad:</span>
+                            <p className="font-semibold">{sale.quantity}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Total:</span>
+                            <p className="font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Fecha:</span>
+                            <p className="text-xs">{new Date(sale.created_at).toLocaleDateString('es-PE')}</p>
+                          </div>
+                        </div>
+                        
+                        {!sale.is_paid && (
+                          <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(sale.id)} className="w-full">
+                            Marcar Pagado
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Vista desktop - Tabla */}
+                  <div className="hidden md:block">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Producto</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Cant.</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {clientSales.map((sale) => (
+                          <tr key={sale.id} className="hover:bg-muted/30">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <Package size={16} className="text-muted-foreground" />
+                                <span className="font-medium text-sm">{sale.products?.name || 'N/A'}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">{sale.rentals?.tables?.name || '-'}</td>
+                            <td className="px-4 py-3 font-semibold">{sale.quantity}</td>
+                            <td className="px-4 py-3 font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${sale.is_paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {sale.is_paid ? 'Pagado' : 'Fiado'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar size={14} />
+                                {new Date(sale.created_at).toLocaleDateString('es-PE')}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {!sale.is_paid && (
+                                <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(sale.id)}>
+                                  Marcar Pagado
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package size={40} className="mx-auto mb-2 opacity-30" />
-                  <p>No hay ventas</p>
+                  <p>No hay ventas registradas</p>
                 </div>
               )}
             </div>

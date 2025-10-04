@@ -37,6 +37,7 @@ export interface Rental {
   tenant_id: number | null;
   client_id: number | null;
   table_id: number | null;
+  user_id: number | null;
   start_time: string;
   end_time: string | null;
   total_amount: number | null;

@@ -53,6 +53,13 @@ interface SessionDetail {
     clients: { name: string } | null;
     tables: { name: string } | null;
   }>;
+  stockReport: Array<{
+    product_name: string;
+    initial_stock: number;
+    final_stock: number;
+    sold_quantity: number;
+    difference: number;
+  }>;
 }
 
 export default function StatsPage() {
@@ -278,6 +285,46 @@ export default function StatsPage() {
         .not('end_time', 'is', null)
         .lte('end_time', sessionEndTime);
 
+      // Obtener snapshots de stock para la sesión
+      const { data: stockSnapshots } = await supabase
+        .from('daily_stock_snapshots')
+        .select(`
+          initial_stock,
+          final_stock,
+          products(name)
+        `)
+        .eq('tenant_id', user?.tenant_id)
+        .eq('session_id', session.id);
+
+      // Calcular ventas por producto durante la sesión
+      const productSales = new Map();
+      (salesData || []).forEach(sale => {
+        const products = Array.isArray(sale.products) ? sale.products[0] : sale.products;
+        const productName = products?.name || 'Producto N/A';
+        if (!productSales.has(productName)) {
+          productSales.set(productName, 0);
+        }
+        productSales.set(productName, productSales.get(productName) + sale.quantity);
+      });
+
+      // Crear reporte de stock
+      const stockReport = (stockSnapshots || []).map(snapshot => {
+        const products = Array.isArray(snapshot.products) ? snapshot.products[0] : snapshot.products;
+        const productName = products?.name || 'Producto N/A';
+        const soldQuantity = productSales.get(productName) || 0;
+        const initialStock = snapshot.initial_stock || 0;
+        const finalStock = snapshot.final_stock || 0;
+        const difference = initialStock - finalStock;
+        
+        return {
+          product_name: productName,
+          initial_stock: initialStock,
+          final_stock: finalStock,
+          sold_quantity: soldQuantity,
+          difference: difference
+        };
+      });
+
       const sessionDetail: SessionDetail = {
         session,
         sales: (salesData || []).map(sale => ({
@@ -290,7 +337,8 @@ export default function StatsPage() {
           ...rental,
           clients: Array.isArray(rental.clients) ? rental.clients[0] : rental.clients,
           tables: Array.isArray(rental.tables) ? rental.tables[0] : rental.tables
-        }))
+        })),
+        stockReport: stockReport
       };
 
       setSelectedSession(sessionDetail);
@@ -654,6 +702,107 @@ export default function StatsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Reporte de Stock */}
+              {selectedSession.stockReport.length > 0 && (
+                <div className="bg-white border rounded-lg mb-6">
+                  <div className="p-4 border-b bg-purple-50">
+                    <h3 className="text-lg font-bold text-purple-800 flex items-center gap-2">
+                      <Package size={20} />
+                      Reporte de Stock ({selectedSession.stockReport.length} productos)
+                    </h3>
+                    <p className="text-sm text-purple-600">Stock inicial vs final de la sesión</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    {/* Vista móvil - Cards */}
+                    <div className="md:hidden divide-y">
+                      {selectedSession.stockReport.map((item, index) => (
+                        <div key={index} className="p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-gray-900">{item.product_name}</h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              item.difference === item.sold_quantity 
+                                ? 'bg-green-100 text-green-800' 
+                                : item.difference > item.sold_quantity
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {item.difference === item.sold_quantity ? 'Correcto' : 'Diferencia'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-gray-600">Stock Inicial:</span>
+                              <p className="font-bold text-blue-600">{item.initial_stock}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Stock Final:</span>
+                              <p className="font-bold text-purple-600">{item.final_stock}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Vendido:</span>
+                              <p className="font-bold text-green-600">{item.sold_quantity}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Diferencia:</span>
+                              <p className={`font-bold ${
+                                item.difference === item.sold_quantity 
+                                  ? 'text-green-600' 
+                                  : 'text-red-600'
+                              }`}>
+                                {item.difference}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Vista desktop - Tabla */}
+                    <div className="hidden md:block">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Producto</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Stock Inicial</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Stock Final</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Vendido</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Diferencia</th>
+                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {selectedSession.stockReport.map((item, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">{item.product_name}</td>
+                              <td className="px-4 py-3 text-center font-bold text-blue-600">{item.initial_stock}</td>
+                              <td className="px-4 py-3 text-center font-bold text-purple-600">{item.final_stock}</td>
+                              <td className="px-4 py-3 text-center font-bold text-green-600">{item.sold_quantity}</td>
+                              <td className={`px-4 py-3 text-center font-bold ${
+                                item.difference === item.sold_quantity ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {item.difference}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  item.difference === item.sold_quantity 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : item.difference > item.sold_quantity
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {item.difference === item.sold_quantity ? 'Correcto' : 
+                                   item.difference > item.sold_quantity ? 'Faltante' : 'Sobrante'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Ventas Detalladas */}

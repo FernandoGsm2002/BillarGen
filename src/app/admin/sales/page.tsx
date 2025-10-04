@@ -32,6 +32,7 @@ interface RentalIncome {
   is_paid: boolean;
   clients: { name: string } | null;
   tables: { name: string } | null;
+  users: { username: string } | null;
 }
 
 type IncomeItem = {
@@ -83,7 +84,7 @@ export default function SalesPage() {
     // Cargar alquileres finalizados
     let rentalsQuery = supabase
       .from('rentals')
-      .select('*, clients(name), tables(name)')
+      .select('*, clients(name), tables(name), users(username)')
       .eq('tenant_id', tenantId)
       .not('end_time', 'is', null)
       .order('end_time', { ascending: false });
@@ -140,7 +141,7 @@ export default function SalesPage() {
       is_paid: rental.is_paid,
       client_name: rental.clients?.name || 'Sin cliente',
       table_name: rental.tables?.name || 'N/A',
-      worker: '-'
+      worker: rental.users?.username || 'N/A'
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

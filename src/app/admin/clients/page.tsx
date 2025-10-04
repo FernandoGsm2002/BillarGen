@@ -306,72 +306,136 @@ export default function ClientsPage() {
           {/* Tabla de Clientes */}
           <Card>
             <CardBody className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead>Total Compras</TableHead>
-                    <TableHead>Deuda Pendiente</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredClients.map((client) => (
-                    <TableRow key={client.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                            <UserCheck size={20} className="text-indigo-600" />
+              {/* Vista móvil - Cards */}
+              <div className="md:hidden">
+                {filteredClients.length > 0 ? (
+                  <div className="divide-y divide-gray-200">
+                    {filteredClients.map((client) => (
+                      <div key={client.id} className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <UserCheck size={20} className="text-indigo-600" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-gray-900">{client.name}</div>
+                              <div className="text-xs text-gray-500">{client.phone || client.email || 'Sin contacto'}</div>
+                            </div>
                           </div>
-                          <div className="text-sm font-bold text-gray-900">{client.name}</div>
+                          <Badge variant={client.total_debt > 0 ? 'danger' : 'success'}>
+                            {client.total_debt > 0 ? 'Con Deuda' : 'Al Día'}
+                          </Badge>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-900">{client.phone || '-'}</div>
-                        <div className="text-xs text-gray-500">{client.email || '-'}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-lg font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</div>
-                        {client.unpaid_sales > 0 && (
-                          <div className="text-xs text-gray-500">{client.unpaid_sales} Ventas sin pagar</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={client.total_debt > 0 ? 'danger' : 'success'}>
-                          {client.total_debt > 0 ? 'Con Deuda' : 'Al Día'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)}>
-                            <Eye size={16} className="mr-1" /> Ver
+                        
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-600">Total Compras:</span>
+                            <p className="font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Deuda:</span>
+                            <p className="font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</p>
+                            {client.unpaid_sales > 0 && (
+                              <p className="text-xs text-gray-500">{client.unpaid_sales} sin pagar</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 pt-2">
+                          <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)} className="flex-1">
+                            <Eye size={16} className="mr-1" /> Ver Detalle
                           </Button>
                           {client.total_debt > 0 && (
-                            <Button size="sm" onClick={() => handlePayDebt(client.id)}>Pagar</Button>
+                            <Button size="sm" onClick={() => handlePayDebt(client.id)} className="flex-1">
+                              Pagar Deuda
+                            </Button>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
+                    <p className="text-gray-600">
+                      {filter === 'with_debt' 
+                        ? 'No hay clientes con deudas pendientes'
+                        : 'Los clientes aparecerán cuando realicen compras'}
+                    </p>
+                  </div>
+                )}
+              </div>
 
-              {filteredClients.length === 0 && (
-                <div className="text-center py-12">
-                  <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
-                  <p className="text-gray-600">
-                    {filter === 'with_debt' 
-                      ? 'No hay clientes con deudas pendientes'
-                      : 'Los clientes aparecerán cuando realicen compras'}
-                  </p>
-                </div>
-              )}
+              {/* Vista desktop - Tabla */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Contacto</TableHead>
+                      <TableHead>Total Compras</TableHead>
+                      <TableHead>Deuda Pendiente</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClients.map((client) => (
+                      <TableRow key={client.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <UserCheck size={20} className="text-indigo-600" />
+                            </div>
+                            <div className="text-sm font-bold text-gray-900">{client.name}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-gray-900">{client.phone || '-'}</div>
+                          <div className="text-xs text-gray-500">{client.email || '-'}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-lg font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</div>
+                          {client.unpaid_sales > 0 && (
+                            <div className="text-xs text-gray-500">{client.unpaid_sales} Ventas sin pagar</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={client.total_debt > 0 ? 'danger' : 'success'}>
+                            {client.total_debt > 0 ? 'Con Deuda' : 'Al Día'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)}>
+                              <Eye size={16} className="mr-1" /> Ver
+                            </Button>
+                            {client.total_debt > 0 && (
+                              <Button size="sm" onClick={() => handlePayDebt(client.id)}>Pagar</Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {filteredClients.length === 0 && (
+                  <div className="text-center py-12">
+                    <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
+                    <p className="text-gray-600">
+                      {filter === 'with_debt' 
+                        ? 'No hay clientes con deudas pendientes'
+                        : 'Los clientes aparecerán cuando realicen compras'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </CardBody>
           </Card>
         </div>
@@ -380,9 +444,9 @@ export default function ClientsPage() {
 
       {/* Modal Detalles Cliente */}
       <Dialog open={selectedClient !== null} onOpenChange={() => setSelectedClient(null)}>
-        <DialogContent className="!max-w-6xl">
+        <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
+            <DialogTitle className="text-xl md:text-2xl">
               Historial de Ventas - {selectedClient?.name}
             </DialogTitle>
           </DialogHeader>
@@ -410,40 +474,69 @@ export default function ClientsPage() {
                 <div className="bg-blue-50 px-4 py-2 border-b">
                   <h3 className="font-bold text-blue-900">Alquileres de Mesas</h3>
                 </div>
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {clientRentals.map((rental) => (
-                      <tr key={rental.id} className="hover:bg-muted/30">
-                        <td className="px-4 py-3 font-medium">{rental.tables?.name || 'N/A'}</td>
-                        <td className="px-4 py-3 font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant={rental.is_paid ? 'success' : 'danger'} className="text-xs">
-                            {rental.is_paid ? 'Pagado' : 'Pendiente'}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {new Date(rental.end_time).toLocaleDateString('es-PE')}
-                        </td>
-                        <td className="px-4 py-3">
-                          {!rental.is_paid && (
-                            <Button size="sm" variant="outline" onClick={() => handleMarkRentalAsPaid(rental.id)}>
-                              Marcar Pagado
-                            </Button>
-                          )}
-                        </td>
+                
+                {/* Vista móvil - Cards */}
+                <div className="md:hidden divide-y">
+                  {clientRentals.map((rental) => (
+                    <div key={rental.id} className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">{rental.tables?.name || 'N/A'}</p>
+                          <p className="text-sm text-gray-500">{new Date(rental.end_time).toLocaleDateString('es-PE')}</p>
+                        </div>
+                        <Badge variant={rental.is_paid ? 'success' : 'danger'} className="text-xs">
+                          {rental.is_paid ? 'Pagado' : 'Pendiente'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</p>
+                        {!rental.is_paid && (
+                          <Button size="sm" variant="outline" onClick={() => handleMarkRentalAsPaid(rental.id)}>
+                            Marcar Pagado
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Vista desktop - Tabla */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {clientRentals.map((rental) => (
+                        <tr key={rental.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 font-medium">{rental.tables?.name || 'N/A'}</td>
+                          <td className="px-4 py-3 font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={rental.is_paid ? 'success' : 'danger'} className="text-xs">
+                              {rental.is_paid ? 'Pagado' : 'Pendiente'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {new Date(rental.end_time).toLocaleDateString('es-PE')}
+                          </td>
+                          <td className="px-4 py-3">
+                            {!rental.is_paid && (
+                              <Button size="sm" variant="outline" onClick={() => handleMarkRentalAsPaid(rental.id)}>
+                                Marcar Pagado
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -452,55 +545,103 @@ export default function ClientsPage() {
               <div className="bg-green-50 px-4 py-2 border-b">
                 <h3 className="font-bold text-green-900">Productos Vendidos</h3>
               </div>
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Producto</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Cantidad</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {clientSales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Package size={16} className="text-muted-foreground" />
-                          <span className="font-medium">{sale.products?.name || 'N/A'}</span>
+              
+              {clientSales.length > 0 ? (
+                <>
+                  {/* Vista móvil - Cards */}
+                  <div className="md:hidden divide-y">
+                    {clientSales.map((sale) => (
+                      <div key={sale.id} className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Package size={16} className="text-muted-foreground" />
+                            <div>
+                              <p className="font-medium text-gray-900">{sale.products?.name || 'N/A'}</p>
+                              <p className="text-sm text-gray-500">{sale.rentals?.tables?.name || 'Sin mesa'}</p>
+                            </div>
+                          </div>
+                          <Badge variant={sale.is_paid ? 'success' : 'danger'} className="text-xs">
+                            {sale.is_paid ? 'Pagado' : 'Fiado'}
+                          </Badge>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {sale.rentals?.tables?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 font-semibold">{sale.quantity}</td>
-                      <td className="px-4 py-3 font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={sale.is_paid ? 'success' : 'danger'} className="text-xs">
-                          {sale.is_paid ? 'Pagado' : 'Fiado'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} />
-                          {new Date(sale.created_at).toLocaleDateString('es-PE')}
+                        
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-600">Cantidad:</span>
+                            <p className="font-semibold">{sale.quantity}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Total:</span>
+                            <p className="font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Fecha:</span>
+                            <p className="text-xs">{new Date(sale.created_at).toLocaleDateString('es-PE')}</p>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
+                        
                         {!sale.is_paid && (
-                          <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(sale.id)}>
+                          <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(sale.id)} className="w-full">
                             Marcar Pagado
                           </Button>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {clientSales.length === 0 && (
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Vista desktop - Tabla */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Producto</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Cantidad</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Total</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {clientSales.map((sale) => (
+                          <tr key={sale.id} className="hover:bg-muted/30">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <Package size={16} className="text-muted-foreground" />
+                                <span className="font-medium">{sale.products?.name || 'N/A'}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {sale.rentals?.tables?.name || '-'}
+                            </td>
+                            <td className="px-4 py-3 font-semibold">{sale.quantity}</td>
+                            <td className="px-4 py-3 font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant={sale.is_paid ? 'success' : 'danger'} className="text-xs">
+                                {sale.is_paid ? 'Pagado' : 'Fiado'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar size={14} />
+                                {new Date(sale.created_at).toLocaleDateString('es-PE')}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {!sale.is_paid && (
+                                <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(sale.id)}>
+                                  Marcar Pagado
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package size={40} className="mx-auto mb-2 opacity-30" />
                   <p>No hay ventas registradas</p>

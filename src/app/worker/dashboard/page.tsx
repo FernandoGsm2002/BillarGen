@@ -34,38 +34,55 @@ export default function WorkerDashboard() {
     }
 
     setUser(parsedUser);
-    loadData(parsedUser.tenant_id);
+    loadData(parsedUser.tenant_id, parsedUser.id);
   }, [router]);
 
-  const loadData = async (tenantId: number) => {
-    // Cargar mesas
+  const loadData = async (tenantId: number, userId: number) => {
+
+    // Cargar mesas (información general del tenant)
     const { data: tablesData } = await supabase
       .from('tables')
       .select('*')
       .eq('tenant_id', tenantId);
 
-    // Cargar rentas activas
+    // Cargar rentas activas del trabajador específico
     const { data: activeRentalsData } = await supabase
       .from('rentals')
       .select('*')
       .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
       .is('end_time', null);
 
-    // Cargar ingresos de hoy
+    // Cargar ingresos de hoy del trabajador específico
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    // Ingresos por rentas de hoy del trabajador específico
     const { data: todayRentalsData } = await supabase
       .from('rentals')
       .select('total_amount')
       .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
       .gte('created_at', today.toISOString())
       .not('total_amount', 'is', null);
+
+    // Ingresos por ventas de hoy del trabajador
+    const { data: todaySalesData } = await supabase
+      .from('sales')
+      .select('total_amount')
+      .eq('tenant_id', tenantId)
+      .eq('worker_id', userId)
+      .gte('created_at', today.toISOString());
+
+    const rentalsRevenue = todayRentalsData?.reduce((sum, r) => sum + Number(r.total_amount), 0) || 0;
+    const salesRevenue = todaySalesData?.reduce((sum, s) => sum + Number(s.total_amount), 0) || 0;
+    const totalRevenue = rentalsRevenue + salesRevenue;
 
     setStats({
       totalTables: tablesData?.length || 0,
       occupiedTables: tablesData?.filter(t => !t.is_available).length || 0,
       activeRentals: activeRentalsData?.length || 0,
-      todayRevenue: todayRentalsData?.reduce((sum, r) => sum + Number(r.total_amount), 0) || 0
+      todayRevenue: totalRevenue
     });
   };
 
@@ -105,7 +122,7 @@ export default function WorkerDashboard() {
             <StatCard title="Ingresos Hoy" value={`S/ ${stats.todayRevenue.toFixed(2)}`} accent="blue" icon={<TrendingUp size={40} />} />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Button variant="outline" onClick={() => router.push('/worker/tables')} className="h-auto flex-col gap-2 p-6 items-start">
               <Image src="/icons/mesa.ico" alt="Mesa" width={24} height={24} />
               <div className="text-left">
@@ -125,6 +142,13 @@ export default function WorkerDashboard() {
               <div className="text-left">
                 <p className="font-semibold">Punto de Venta</p>
                 <p className="text-xs text-muted-foreground">Registrar consumos</p>
+              </div>
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/worker/earnings')} className="h-auto flex-col gap-2 p-6 items-start">
+              <TrendingUp size={24} />
+              <div className="text-left">
+                <p className="font-semibold">Mis Ingresos</p>
+                <p className="text-xs text-muted-foreground">Historial de ventas y rentas</p>
               </div>
             </Button>
           </div>
