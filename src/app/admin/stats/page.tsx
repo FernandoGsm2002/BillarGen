@@ -3,81 +3,83 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { TenantConfig } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { TrendingUp, DollarSign, ShoppingCart, Clock, Users, Package, Calendar, Activity, Eye } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardHeader, CardBody, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
+import { TrendingUp, DollarSign, ShoppingCart, Users, Package, Calendar, Download, FileText, FileSpreadsheet, Eye, BarChart3, Activity, TrendingDown, TrendingUpIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
-interface Stats24h {
-  totalSales: number;
-  totalAmount: number;
-  totalProducts: number;
-  totalRentals: number;
-  topProducts: Array<{ name: string; quantity: number; total: number }>;
-  topWorkers: Array<{ username: string; sales: number; total: number }>;
-  hourlyData: Array<{ hour: number; sales: number; amount: number }>;
-}
-
-interface SessionData {
-  id: number;
-  session_name: string;
-  start_time: string;
-  end_time: string | null;
-  is_active: boolean;
-  total_sales_revenue: number;
-  total_rentals_revenue: number;
+interface WeeklyStats {
+  week: string;
+  sales_revenue: number;
+  rentals_revenue: number;
   total_revenue: number;
   products_sold: number;
   rentals_completed: number;
-  duration: string;
+  week_start: string;
+  week_end: string;
 }
 
-interface SessionDetail {
-  session: SessionData;
-  sales: Array<{
-    id: number;
-    quantity: number;
-    total_amount: number;
-    created_at: string;
-    products: { name: string } | null;
-    clients: { name: string } | null;
-    users: { username: string } | null;
-  }>;
-  rentals: Array<{
-    id: number;
-    total_amount: number;
-    start_time: string;
-    end_time: string;
-    clients: { name: string } | null;
-    tables: { name: string } | null;
-  }>;
-  stockReport: Array<{
-    product_name: string;
-    initial_stock: number;
-    final_stock: number;
-    sold_quantity: number;
-    difference: number;
-  }>;
+interface DailyStats {
+  date: string;
+  sales_revenue: number;
+  rentals_revenue: number;
+  total_revenue: number;
+  products_sold: number;
+  rentals_completed: number;
+}
+
+interface TopProduct {
+  name: string;
+  quantity: number;
+  revenue: number;
+  image_url: string | null;
+}
+
+interface TopWorker {
+  username: string;
+  sales_count: number;
+  revenue: number;
+}
+
+// Interface removida - no se usa actualmente
+
+interface ComprehensiveStats {
+  // Totales generales
+  total_all_time_revenue: number;
+  total_all_time_sales: number;
+  total_all_time_products_sold: number;
+  total_all_time_rentals: number;
+  
+  // Esta semana vs semana anterior
+  current_week: WeeklyStats;
+  previous_week: WeeklyStats;
+  
+  // Últimos 7 días
+  daily_stats: DailyStats[];
+  
+  // Top productos y trabajadores
+  top_products: TopProduct[];
+  top_workers: TopWorker[];
+  
+  // Estadísticas de este mes
+  current_month_revenue: number;
+  current_month_sales: number;
+  previous_month_revenue: number;
+  previous_month_sales: number;
 }
 
 export default function StatsPage() {
   const router = useRouter();
   const [user, setUser] = useState<{ id: number; username: string; role: string; tenant_id: number } | null>(null);
-  const [stats, setStats] = useState<Stats24h>({
-    totalSales: 0,
-    totalAmount: 0,
-    totalProducts: 0,
-    totalRentals: 0,
-    topProducts: [],
-    topWorkers: [],
-    hourlyData: []
-  });
-  const [sessions, setSessions] = useState<SessionData[]>([]);
+  const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
+  const [stats, setStats] = useState<ComprehensiveStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null);
-  const [showSessionDetail, setShowSessionDetail] = useState(false);
+  // const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('week'); // Para uso futuro
+  const [exporting, setExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -93,259 +95,308 @@ export default function StatsPage() {
     }
 
     setUser(parsedUser);
-    loadStats(parsedUser.tenant_id);
-    loadSessions(parsedUser.tenant_id);
+    loadTenantConfig(parsedUser.tenant_id);
+    loadComprehensiveStats(parsedUser.tenant_id);
   }, [router]);
 
-  const loadStats = async (tenantId: number) => {
-    setLoading(true);
-    
-    // Fecha de hace 24 horas
-    const last24h = new Date();
-    last24h.setHours(last24h.getHours() - 24);
-
-    // Ventas últimas 24h
-    const { data: salesData } = await supabase
-      .from('sales')
-      .select('*, products(name), users(username)')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', last24h.toISOString());
-
-    // Rentas últimas 24h
-    const { data: rentalsData } = await supabase
-      .from('rentals')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', last24h.toISOString());
-
-    if (salesData) {
-      // Calcular totales
-      const totalAmount = salesData.reduce((sum, s) => sum + Number(s.total_amount), 0);
-      const totalProducts = salesData.reduce((sum, s) => sum + s.quantity, 0);
-
-      // Top productos
-      const productMap = new Map();
-      salesData.forEach(sale => {
-        const name = sale.products?.name || 'Desconocido';
-        if (!productMap.has(name)) {
-          productMap.set(name, { name, quantity: 0, total: 0 });
-        }
-        const product = productMap.get(name);
-        product.quantity += sale.quantity;
-        product.total += Number(sale.total_amount);
-      });
-      const topProducts = Array.from(productMap.values())
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5);
-
-      // Top trabajadores
-      const workerMap = new Map();
-      salesData.forEach(sale => {
-        const username = sale.users?.username || 'Desconocido';
-        if (!workerMap.has(username)) {
-          workerMap.set(username, { username, sales: 0, total: 0 });
-        }
-        const worker = workerMap.get(username);
-        worker.sales += 1;
-        worker.total += Number(sale.total_amount);
-      });
-      const topWorkers = Array.from(workerMap.values())
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5);
-
-      // Ventas por hora
-      const hourlyMap = new Map();
-      salesData.forEach(sale => {
-        const hour = new Date(sale.created_at).getHours();
-        if (!hourlyMap.has(hour)) {
-          hourlyMap.set(hour, { hour, sales: 0, amount: 0 });
-        }
-        const hourData = hourlyMap.get(hour);
-        hourData.sales += 1;
-        hourData.amount += Number(sale.total_amount);
-      });
-      const hourlyData = Array.from(hourlyMap.values()).sort((a, b) => a.hour - b.hour);
-
-      setStats({
-        totalSales: salesData.length,
-        totalAmount,
-        totalProducts,
-        totalRentals: rentalsData?.length || 0,
-        topProducts,
-        topWorkers,
-        hourlyData
-      });
-    }
-
-    setLoading(false);
-  };
-
-  const loadSessions = async (tenantId: number) => {
+  const loadTenantConfig = async (tenantId: number) => {
     try {
-      // Obtener sesiones de los últimos 30 días
-      const last30Days = new Date();
-      last30Days.setDate(last30Days.getDate() - 30);
-
-      const { data: sessionsData } = await supabase
-        .from('daily_sessions')
+      const { data, error } = await supabase
+        .from('tenant_config')
         .select('*')
         .eq('tenant_id', tenantId)
-        .gte('start_time', last30Days.toISOString())
-        .order('start_time', { ascending: false });
+        .single();
 
-      if (sessionsData) {
-        // Calcular datos financieros para cada sesión
-        const sessionsWithFinancials = await Promise.all(
-          sessionsData.map(async (session) => {
-            const sessionEndTime = session.end_time || new Date().toISOString();
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error cargando configuración:', error);
+        return;
+      }
 
-            // Obtener ventas de la sesión
-            const { data: salesData } = await supabase
-              .from('sales')
-              .select('total_amount, quantity')
-              .eq('tenant_id', tenantId)
-              .gte('created_at', session.start_time)
-              .lt('created_at', sessionEndTime);
-
-            // Obtener rentas de la sesión
-            const { data: rentalsData } = await supabase
-              .from('rentals')
-              .select('total_amount')
-              .eq('tenant_id', tenantId)
-              .gte('start_time', session.start_time)
-              .not('end_time', 'is', null)
-              .lte('end_time', sessionEndTime);
-
-            const total_sales_revenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0) || 0;
-            const total_rentals_revenue = rentalsData?.reduce((sum, rental) => sum + Number(rental.total_amount || 0), 0) || 0;
-            const total_revenue = total_sales_revenue + total_rentals_revenue;
-            const products_sold = salesData?.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0) || 0;
-            const rentals_completed = rentalsData?.length || 0;
-
-            // Calcular duración
-            const startTime = new Date(session.start_time);
-            const endTime = new Date(sessionEndTime);
-            const durationMs = endTime.getTime() - startTime.getTime();
-            const hours = Math.floor(durationMs / (1000 * 60 * 60));
-            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-            const duration = `${hours}h ${minutes}m`;
-
-            return {
-              ...session,
-              total_sales_revenue,
-              total_rentals_revenue,
-              total_revenue,
-              products_sold,
-              rentals_completed,
-              duration
-            };
-          })
-        );
-
-        setSessions(sessionsWithFinancials);
+      if (data) {
+        setTenantConfig(data);
       }
     } catch (error) {
-      console.error('Error cargando sesiones:', error);
+      console.error('Error en loadTenantConfig:', error);
     }
   };
 
-  const loadSessionDetail = async (session: SessionData) => {
+  const loadComprehensiveStats = async (tenantId: number) => {
+    setLoading(true);
     try {
-      const sessionEndTime = session.end_time || new Date().toISOString();
+      // Fechas de referencia
+      const now = new Date();
+      const currentWeekStart = new Date(now);
+      currentWeekStart.setDate(now.getDate() - now.getDay()); // Domingo
+      currentWeekStart.setHours(0, 0, 0, 0);
+      
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+      currentWeekEnd.setHours(23, 59, 59, 999);
+      
+      const previousWeekStart = new Date(currentWeekStart);
+      previousWeekStart.setDate(currentWeekStart.getDate() - 7);
+      
+      const previousWeekEnd = new Date(currentWeekEnd);
+      previousWeekEnd.setDate(currentWeekEnd.getDate() - 7);
 
-      // Obtener ventas detalladas de la sesión
-      const { data: salesData } = await supabase
-        .from('sales')
-        .select(`
-          id,
-          quantity,
-          total_amount,
-          created_at,
-          products(name),
-          clients(name),
-          users(username)
-        `)
-        .eq('tenant_id', user?.tenant_id)
-        .gte('created_at', session.start_time)
-        .lt('created_at', sessionEndTime);
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
-      // Obtener rentas detalladas de la sesión
-      const { data: rentalsData } = await supabase
-        .from('rentals')
-        .select(`
-          id,
-          total_amount,
-          start_time,
-          end_time,
-          clients(name),
-          tables(name)
-        `)
-        .eq('tenant_id', user?.tenant_id)
-        .gte('start_time', session.start_time)
-        .not('end_time', 'is', null)
-        .lte('end_time', sessionEndTime);
-
-      // Obtener snapshots de stock para la sesión
-      const { data: stockSnapshots } = await supabase
-        .from('daily_stock_snapshots')
-        .select(`
-          initial_stock,
-          final_stock,
-          products(name)
-        `)
-        .eq('tenant_id', user?.tenant_id)
-        .eq('session_id', session.id);
-
-      // Calcular ventas por producto durante la sesión
-      const productSales = new Map();
-      (salesData || []).forEach(sale => {
-        const products = Array.isArray(sale.products) ? sale.products[0] : sale.products;
-        const productName = products?.name || 'Producto N/A';
-        if (!productSales.has(productName)) {
-          productSales.set(productName, 0);
-        }
-        productSales.set(productName, productSales.get(productName) + sale.quantity);
-      });
-
-      // Crear reporte de stock
-      const stockReport = (stockSnapshots || []).map(snapshot => {
-        const products = Array.isArray(snapshot.products) ? snapshot.products[0] : snapshot.products;
-        const productName = products?.name || 'Producto N/A';
-        const soldQuantity = productSales.get(productName) || 0;
-        const initialStock = snapshot.initial_stock || 0;
-        const finalStock = snapshot.final_stock || 0;
-        const difference = initialStock - finalStock;
+      // Obtener datos de ventas y rentas
+      const [
+        salesData,
+        rentalsData,
+        topProductsData,
+        topWorkersData
+      ] = await Promise.all([
+        // Ventas
+        supabase
+          .from('sales')
+          .select('total_amount, quantity, created_at, products(name, image_url), users(username)')
+          .eq('tenant_id', tenantId),
         
-        return {
-          product_name: productName,
-          initial_stock: initialStock,
-          final_stock: finalStock,
-          sold_quantity: soldQuantity,
-          difference: difference
-        };
+        // Rentas
+        supabase
+          .from('rentals')
+          .select('total_amount, start_time, end_time')
+          .eq('tenant_id', tenantId)
+          .not('end_time', 'is', null),
+        
+        // Top productos
+        supabase
+          .from('sales')
+          .select('quantity, total_amount, products(name, image_url)')
+          .eq('tenant_id', tenantId)
+          .gte('created_at', currentWeekStart.toISOString()),
+        
+        // Top workers
+        supabase
+          .from('sales')
+          .select('total_amount, users(username)')
+          .eq('tenant_id', tenantId)
+          .gte('created_at', currentWeekStart.toISOString())
+      ]);
+
+      if (salesData.error || rentalsData.error) {
+        throw new Error('Error cargando datos');
+      }
+
+      // Procesar estadísticas de la semana actual
+      const currentWeekSales = salesData.data?.filter(sale => 
+        new Date(sale.created_at) >= currentWeekStart && new Date(sale.created_at) <= currentWeekEnd
+      ) || [];
+      
+      const currentWeekRentals = rentalsData.data?.filter(rental => 
+        new Date(rental.start_time) >= currentWeekStart && new Date(rental.start_time) <= currentWeekEnd
+      ) || [];
+
+      // Procesar estadísticas de la semana anterior
+      const previousWeekSales = salesData.data?.filter(sale => 
+        new Date(sale.created_at) >= previousWeekStart && new Date(sale.created_at) <= previousWeekEnd
+      ) || [];
+      
+      const previousWeekRentals = rentalsData.data?.filter(rental => 
+        new Date(rental.start_time) >= previousWeekStart && new Date(rental.start_time) <= previousWeekEnd
+      ) || [];
+
+      // Generar estadísticas diarias para los últimos 7 días
+      const dailyStats: DailyStats[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
+        
+        const nextDate = new Date(date);
+        nextDate.setDate(date.getDate() + 1);
+
+        const daySales = salesData.data?.filter(sale => 
+          new Date(sale.created_at) >= date && new Date(sale.created_at) < nextDate
+        ) || [];
+        
+        const dayRentals = rentalsData.data?.filter(rental => 
+          new Date(rental.start_time) >= date && new Date(rental.start_time) < nextDate
+        ) || [];
+
+        dailyStats.push({
+          date: date.toISOString().split('T')[0],
+          sales_revenue: daySales.reduce((sum, s) => sum + Number(s.total_amount), 0),
+          rentals_revenue: dayRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+          total_revenue: daySales.reduce((sum, s) => sum + Number(s.total_amount), 0) + 
+                        dayRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+          products_sold: daySales.reduce((sum, s) => sum + Number(s.quantity), 0),
+          rentals_completed: dayRentals.length
+        });
+      }
+
+      // Procesar top productos
+      const productStats = new Map();
+      topProductsData.data?.forEach(sale => {
+        if (sale.products) {
+          // Manejar tanto objeto como array
+          const product = Array.isArray(sale.products) ? sale.products[0] : sale.products;
+          if (product && product.name) {
+            const key = product.name;
+            if (!productStats.has(key)) {
+              productStats.set(key, {
+                name: product.name,
+                quantity: 0,
+                revenue: 0,
+                image_url: product.image_url
+              });
+            }
+            const productStat = productStats.get(key);
+            productStat.quantity += Number(sale.quantity);
+            productStat.revenue += Number(sale.total_amount);
+          }
+        }
       });
 
-      const sessionDetail: SessionDetail = {
-        session,
-        sales: (salesData || []).map(sale => ({
-          ...sale,
-          products: Array.isArray(sale.products) ? sale.products[0] : sale.products,
-          clients: Array.isArray(sale.clients) ? sale.clients[0] : sale.clients,
-          users: Array.isArray(sale.users) ? sale.users[0] : sale.users
-        })),
-        rentals: (rentalsData || []).map(rental => ({
-          ...rental,
-          clients: Array.isArray(rental.clients) ? rental.clients[0] : rental.clients,
-          tables: Array.isArray(rental.tables) ? rental.tables[0] : rental.tables
-        })),
-        stockReport: stockReport
+      const topProducts = Array.from(productStats.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      // Procesar top workers
+      const workerStats = new Map();
+      topWorkersData.data?.forEach(sale => {
+        if (sale.users) {
+          // Manejar tanto objeto como array
+          const user = Array.isArray(sale.users) ? sale.users[0] : sale.users;
+          if (user && user.username) {
+            const key = user.username;
+            if (!workerStats.has(key)) {
+              workerStats.set(key, {
+                username: user.username,
+                sales_count: 0,
+                revenue: 0
+              });
+            }
+            const worker = workerStats.get(key);
+            worker.sales_count += 1;
+            worker.revenue += Number(sale.total_amount);
+          }
+        }
+      });
+
+      const topWorkers = Array.from(workerStats.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      // Estadísticas del mes actual vs anterior
+      const currentMonthSales = salesData.data?.filter(sale => 
+        new Date(sale.created_at) >= currentMonthStart
+      ) || [];
+      
+      const currentMonthRentals = rentalsData.data?.filter(rental => 
+        new Date(rental.start_time) >= currentMonthStart
+      ) || [];
+
+      const previousMonthSales = salesData.data?.filter(sale => 
+        new Date(sale.created_at) >= previousMonthStart && new Date(sale.created_at) <= previousMonthEnd
+      ) || [];
+      
+      const previousMonthRentals = rentalsData.data?.filter(rental => 
+        new Date(rental.start_time) >= previousMonthStart && new Date(rental.start_time) <= previousMonthEnd
+      ) || [];
+
+      const comprehensiveStats: ComprehensiveStats = {
+        total_all_time_revenue: 
+          (salesData.data?.reduce((sum, s) => sum + Number(s.total_amount), 0) || 0) +
+          (rentalsData.data?.reduce((sum, r) => sum + Number(r.total_amount), 0) || 0),
+        total_all_time_sales: salesData.data?.length || 0,
+        total_all_time_products_sold: salesData.data?.reduce((sum, s) => sum + Number(s.quantity), 0) || 0,
+        total_all_time_rentals: rentalsData.data?.length || 0,
+        
+        current_week: {
+          week: `${currentWeekStart.toLocaleDateString('es-PE')} - ${currentWeekEnd.toLocaleDateString('es-PE')}`,
+          sales_revenue: currentWeekSales.reduce((sum, s) => sum + Number(s.total_amount), 0),
+          rentals_revenue: currentWeekRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+          total_revenue: 
+            currentWeekSales.reduce((sum, s) => sum + Number(s.total_amount), 0) +
+            currentWeekRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+          products_sold: currentWeekSales.reduce((sum, s) => sum + Number(s.quantity), 0),
+          rentals_completed: currentWeekRentals.length,
+          week_start: currentWeekStart.toISOString(),
+          week_end: currentWeekEnd.toISOString()
+        },
+        
+        previous_week: {
+          week: `${previousWeekStart.toLocaleDateString('es-PE')} - ${previousWeekEnd.toLocaleDateString('es-PE')}`,
+          sales_revenue: previousWeekSales.reduce((sum, s) => sum + Number(s.total_amount), 0),
+          rentals_revenue: previousWeekRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+          total_revenue: 
+            previousWeekSales.reduce((sum, s) => sum + Number(s.total_amount), 0) +
+            previousWeekRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+          products_sold: previousWeekSales.reduce((sum, s) => sum + Number(s.quantity), 0),
+          rentals_completed: previousWeekRentals.length,
+          week_start: previousWeekStart.toISOString(),
+          week_end: previousWeekEnd.toISOString()
+        },
+        
+        daily_stats: dailyStats,
+        top_products: topProducts,
+        top_workers: topWorkers,
+        
+        current_month_revenue: 
+          currentMonthSales.reduce((sum, s) => sum + Number(s.total_amount), 0) +
+          currentMonthRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+        current_month_sales: currentMonthSales.length,
+        
+        previous_month_revenue: 
+          previousMonthSales.reduce((sum, s) => sum + Number(s.total_amount), 0) +
+          previousMonthRentals.reduce((sum, r) => sum + Number(r.total_amount), 0),
+        previous_month_sales: previousMonthSales.length
       };
 
-      setSelectedSession(sessionDetail);
-      setShowSessionDetail(true);
+      setStats(comprehensiveStats);
     } catch (error) {
-      console.error('Error cargando detalle de sesión:', error);
-      alert('Error al cargar los detalles de la sesión');
+      console.error('Error cargando estadísticas:', error);
+      alert('Error al cargar estadísticas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculatePercentageChange = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const handleExportToPDF = async () => {
+    if (!stats) return;
+    
+    setExporting(true);
+    try {
+      const { exportToPDF } = await import('@/lib/exportUtils');
+      await exportToPDF(stats, tenantConfig);
+      
+      const businessName = tenantConfig?.business_name || 'Mi Negocio';
+      alert(`✅ Reporte PDF descargado exitosamente para ${businessName}`);
+    } catch (error) {
+      console.error('Error exportando PDF:', error);
+      alert('❌ Error al generar reporte PDF. Verifica que el navegador permita descargas.');
+    } finally {
+      setExporting(false);
+      setShowExportModal(false);
+    }
+  };
+
+  const handleExportToExcel = async () => {
+    if (!stats) return;
+    
+    setExporting(true);
+    try {
+      const { exportToExcel } = await import('@/lib/exportUtils');
+      await exportToExcel(stats, tenantConfig);
+      
+      const businessName = tenantConfig?.business_name || 'Mi Negocio';
+      alert(`✅ Reporte Excel descargado exitosamente para ${businessName}`);
+    } catch (error) {
+      console.error('Error exportando Excel:', error);
+      alert('❌ Error al generar reporte Excel. Verifica que el navegador permita descargas.');
+    } finally {
+      setExporting(false);
+      setShowExportModal(false);
     }
   };
 
@@ -353,556 +404,386 @@ export default function StatsPage() {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <div className="flex h-screen bg-background">
+          <Sidebar role={user.role as 'admin' | 'worker' | 'super_admin'} username={user.username} />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Activity size={64} className="mx-auto mb-4 text-primary animate-spin" />
+              <h2 className="text-2xl font-bold mb-2">Cargando Estadísticas</h2>
+              <p className="text-muted-foreground">Analizando datos de tu negocio...</p>
+            </div>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <SidebarProvider>
+        <div className="flex h-screen bg-background">
+          <Sidebar role={user.role as 'admin' | 'worker' | 'super_admin'} username={user.username} />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <TrendingDown size={64} className="mx-auto mb-4 text-gray-400" />
+              <h2 className="text-2xl font-bold mb-2">Sin Datos</h2>
+              <p className="text-muted-foreground">No hay datos suficientes para mostrar estadísticas</p>
+            </div>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  const weeklyRevenueChange = calculatePercentageChange(stats.current_week.total_revenue, stats.previous_week.total_revenue);
+  const weeklySalesChange = calculatePercentageChange(stats.current_week.products_sold, stats.previous_week.products_sold);
+  const monthlyRevenueChange = calculatePercentageChange(stats.current_month_revenue, stats.previous_month_revenue);
+
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-background">
         <Sidebar role={user.role as 'admin' | 'worker' | 'super_admin'} username={user.username} />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="bg-card border-b">
-          <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="md:hidden" />
-              <h1 className="text-3xl font-bold">📊 Estadísticas</h1>
+        
+        <div className="flex-1 overflow-auto">
+          {/* Header */}
+          <div className="bg-card border-b">
+            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <SidebarTrigger className="md:hidden" />
+                  <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl text-white">
+                    <BarChart3 size={32} />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold">Estadísticas</h1>
+                    <p className="text-base text-muted-foreground mt-1">Análisis completo de tu negocio</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowExportModal(true)}
+                    className="gap-2"
+                  >
+                    <Download size={20} />
+                    Exportar
+                  </Button>
+                  <Button
+                    onClick={() => loadComprehensiveStats(user.tenant_id)}
+                    className="gap-2"
+                  >
+                    <Activity size={20} />
+                    Actualizar
+                  </Button>
+                </div>
+              </div>
             </div>
-            <p className="text-base text-muted-foreground mt-1">Últimas 24 horas</p>
           </div>
-        </div>
 
-        <div className="p-4 md:p-6 lg:p-8">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Cargando estadísticas...</p>
+          <div className="p-4 md:p-6 lg:p-8">
+            {/* Resumen General */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <StatCard
+                title="Ingresos Totales"
+                value={`S/ ${stats.total_all_time_revenue.toFixed(2)}`}
+                accent="emerald"
+                icon={<DollarSign size={40} />}
+              />
+              <StatCard
+                title="Ventas Totales"
+                value={stats.total_all_time_sales}
+                accent="blue"
+                icon={<ShoppingCart size={40} />}
+              />
+              <StatCard
+                title="Productos Vendidos"
+                value={stats.total_all_time_products_sold}
+                accent="blue"
+                icon={<Package size={40} />}
+              />
+              <StatCard
+                title="Mesas Rentadas"
+                value={stats.total_all_time_rentals}
+                accent="amber"
+                icon={<Calendar size={40} />}
+              />
             </div>
-          ) : (
-            <>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <Card variant="stat">
-                  <CardHeader accent="emerald">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-700 text-sm font-bold uppercase">Total Ventas</p>
-                        <p className="text-4xl font-bold text-gray-900 mt-2">S/ {stats.totalAmount.toFixed(2)}</p>
+
+            {/* Comparativo Semanal */}
+            <Card className="mb-8">
+              <CardHeader>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  📊 Comparativo Semanal
+                </h2>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Semana Actual */}
+                  <div className="bg-gradient-to-br from-green-50 to-blue-50 p-6 rounded-lg border border-green-200">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                      📅 Semana Actual ({stats.current_week.week})
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Ingresos por Ventas:</span>
+                        <span className="font-bold text-green-600">S/ {stats.current_week.sales_revenue.toFixed(2)}</span>
                       </div>
-                      <DollarSign size={48} className="text-green-600 opacity-20" />
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Ingresos por Rentas:</span>
+                        <span className="font-bold text-blue-600">S/ {stats.current_week.rentals_revenue.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="text-gray-900 font-semibold">Total:</span>
+                        <span className="font-bold text-purple-600 text-xl">S/ {stats.current_week.total_revenue.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Productos Vendidos:</span>
+                        <span className="font-bold">{stats.current_week.products_sold}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Mesas Rentadas:</span>
+                        <span className="font-bold">{stats.current_week.rentals_completed}</span>
+                      </div>
                     </div>
-                  </CardHeader>
-                </Card>
+                  </div>
 
-                <Card variant="stat">
-                  <CardHeader accent="blue">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-700 text-sm font-bold uppercase">Transacciones</p>
-                        <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalSales}</p>
+                  {/* Semana Anterior */}
+                  <div className="bg-gradient-to-br from-gray-50 to-slate-50 p-6 rounded-lg border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                      📅 Semana Anterior ({stats.previous_week.week})
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Ingresos por Ventas:</span>
+                        <span className="font-bold text-gray-700">S/ {stats.previous_week.sales_revenue.toFixed(2)}</span>
                       </div>
-                      <ShoppingCart size={48} className="text-blue-600 opacity-20" />
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Ingresos por Rentas:</span>
+                        <span className="font-bold text-gray-700">S/ {stats.previous_week.rentals_revenue.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="text-gray-900 font-semibold">Total:</span>
+                        <span className="font-bold text-gray-700 text-xl">S/ {stats.previous_week.total_revenue.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Productos Vendidos:</span>
+                        <span className="font-bold text-gray-700">{stats.previous_week.products_sold}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Mesas Rentadas:</span>
+                        <span className="font-bold text-gray-700">{stats.previous_week.rentals_completed}</span>
+                      </div>
                     </div>
-                  </CardHeader>
-                </Card>
+                  </div>
+                </div>
 
-                <Card variant="stat">
-                  <CardHeader accent="slate">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-700 text-sm font-bold uppercase">Productos Vendidos</p>
-                        <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalProducts}</p>
-                      </div>
-                      <Package size={48} className="text-purple-600 opacity-20" />
+                {/* Indicadores de Cambio */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                  <div className={`p-4 rounded-lg text-center ${weeklyRevenueChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {weeklyRevenueChange >= 0 ? <TrendingUpIcon size={20} /> : <TrendingDown size={20} />}
+                      <span className="font-bold">{weeklyRevenueChange.toFixed(1)}%</span>
                     </div>
-                  </CardHeader>
-                </Card>
-
-                <Card variant="stat">
-                  <CardHeader accent="amber">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-700 text-sm font-bold uppercase">Rentas Iniciadas</p>
-                        <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalRentals}</p>
-                      </div>
-                      <Clock size={48} className="text-orange-600 opacity-20" />
+                    <p className="text-sm font-medium">Cambio en Ingresos</p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg text-center ${weeklySalesChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {weeklySalesChange >= 0 ? <TrendingUpIcon size={20} /> : <TrendingDown size={20} />}
+                      <span className="font-bold">{weeklySalesChange.toFixed(1)}%</span>
                     </div>
-                  </CardHeader>
-                </Card>
-              </div>
+                    <p className="text-sm font-medium">Cambio en Ventas</p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg text-center ${monthlyRevenueChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {monthlyRevenueChange >= 0 ? <TrendingUpIcon size={20} /> : <TrendingDown size={20} />}
+                      <span className="font-bold">{monthlyRevenueChange.toFixed(1)}%</span>
+                    </div>
+                    <p className="text-sm font-medium">Cambio Mensual</p>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Top Productos */}
-                <Card>
-                  <CardHeader accent="blue">
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                      <TrendingUp size={24} className="text-indigo-600" />
-                      Top 5 Productos
-                    </h2>
-                  </CardHeader>
-                  <CardBody>
-                    {stats.topProducts.length > 0 ? (
-                      <div className="space-y-3">
-                        {stats.topProducts.map((product, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold">
-                                {index + 1}
-                              </div>
-                              <div>
-                                <p className="font-bold text-gray-900">{product.name}</p>
-                                <p className="text-sm text-gray-600">{product.quantity} unidades</p>
-                              </div>
-                            </div>
-                            <p className="text-lg font-bold text-green-600">S/ {product.total.toFixed(2)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-gray-500 py-8">No hay datos</p>
-                    )}
-                  </CardBody>
-                </Card>
-
-                {/* Top Trabajadores */}
-                <Card>
-                  <CardHeader accent="blue">
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                      <Users size={24} className="text-blue-600" />
-                      Top 5 Vendedores
-                    </h2>
-                  </CardHeader>
-                  <CardBody>
-                    {stats.topWorkers.length > 0 ? (
-                      <div className="space-y-3">
-                        {stats.topWorkers.map((worker, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-                                {index + 1}
-                              </div>
-                              <div>
-                                <p className="font-bold text-gray-900">{worker.username}</p>
-                                <p className="text-sm text-gray-600">{worker.sales} ventas</p>
-                              </div>
-                            </div>
-                            <p className="text-lg font-bold text-green-600">S/ {worker.total.toFixed(2)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-gray-500 py-8">No hay datos</p>
-                    )}
-                  </CardBody>
-                </Card>
-              </div>
-
-              {/* Ventas por Hora */}
-              {stats.hourlyData.length > 0 && (
-                <Card className="mt-8">
-                  <CardHeader accent="slate">
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                      <Clock size={24} className="text-purple-600" />
-                      Ventas por Hora
-                    </h2>
-                  </CardHeader>
-                  <CardBody>
-                    <div className="space-y-2">
-                      {stats.hourlyData.map((hour) => (
-                        <div key={hour.hour} className="flex items-center gap-4">
-                          <div className="w-16 text-sm font-bold text-gray-700">
-                            {String(hour.hour).padStart(2, '0')}:00
-                          </div>
-                          <div className="flex-1">
-                            <div className="bg-gray-200 rounded-full h-8 overflow-hidden">
-                              <div
-                                className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full flex items-center justify-end px-3 text-white font-bold text-sm"
-                                style={{ width: `${(hour.amount / stats.totalAmount) * 100}%` }}
-                              >
-                                {hour.sales > 0 && `${hour.sales} ventas`}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="w-24 text-right font-bold text-gray-900">
-                            S/ {hour.amount.toFixed(2)}
-                          </div>
+            {/* Gráfico de Tendencia Diaria */}
+            <Card className="mb-8">
+              <CardHeader>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  📈 Tendencia Diaria (Últimos 7 días)
+                </h2>
+              </CardHeader>
+              <CardBody>
+                <div className="space-y-4">
+                  {stats.daily_stats.map((day, index) => (
+                    <div key={day.date} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm font-medium text-gray-600 w-24">
+                          {new Date(day.date).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                         </div>
-                      ))}
+                        <div className="w-48 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
+                            style={{ 
+                              width: `${Math.max(5, (day.total_revenue / Math.max(...stats.daily_stats.map(d => d.total_revenue))) * 100)}%` 
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-lg">S/ {day.total_revenue.toFixed(2)}</div>
+                        <div className="text-sm text-gray-600">{day.products_sold} productos</div>
+                      </div>
                     </div>
-                  </CardBody>
-                </Card>
-              )}
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
 
-              {/* Historial de Sesiones */}
-              <Card className="mt-8">
-                <CardHeader accent="emerald">
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Activity size={24} className="text-green-600" />
-                    Historial de Sesiones (Últimos 30 días)
+            {/* Top Productos y Trabajadores */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Top Productos */}
+              <Card>
+                <CardHeader>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    🏆 Top Productos (Esta Semana)
                   </h2>
                 </CardHeader>
                 <CardBody>
-                  {sessions.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <div className="min-w-full">
-                        <div className="grid grid-cols-1 gap-4 md:hidden">
-                          {/* Vista móvil - Cards */}
-                          {sessions.map((session) => (
-                            <div key={session.id} className="bg-gray-50 rounded-lg p-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-gray-900">{session.session_name}</h3>
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  session.is_active 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {session.is_active ? 'Activa' : 'Finalizada'}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                  <span className="text-gray-600">Inicio:</span>
-                                  <p className="font-medium">{new Date(session.start_time).toLocaleString('es-PE')}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Duración:</span>
-                                  <p className="font-medium">{session.duration}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Ingresos:</span>
-                                  <p className="font-bold text-green-600">S/ {session.total_revenue.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Productos:</span>
-                                  <p className="font-medium">{session.products_sold}</p>
-                                </div>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => loadSessionDetail(session)}
-                                className="flex items-center gap-1 w-full mt-3"
-                              >
-                                <Eye size={14} />
-                                Ver Detalle
-                              </Button>
-                            </div>
-                          ))}
+                  <div className="space-y-4">
+                    {stats.top_products.length > 0 ? stats.top_products.map((product, idx) => (
+                      <div key={product.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <p className="font-semibold">{product.name}</p>
+                            <p className="text-sm text-gray-600">{product.quantity} unidades</p>
+                          </div>
                         </div>
-
-                        {/* Vista desktop - Tabla */}
-                        <div className="hidden md:block">
-                          <table className="min-w-full">
-                            <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Sesión</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Fecha/Hora</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Duración</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Ventas</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Rentas</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Total</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Productos</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
-                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Acciones</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                              {sessions.map((session) => (
-                                <tr key={session.id} className="hover:bg-gray-50">
-                                  <td className="py-3 px-4">
-                                    <div className="font-medium text-gray-900">{session.session_name}</div>
-                                  </td>
-                                  <td className="py-3 px-4 text-sm text-gray-600">
-                                    {new Date(session.start_time).toLocaleString('es-PE')}
-                                  </td>
-                                  <td className="py-3 px-4 text-center text-sm font-medium">
-                                    {session.duration}
-                                  </td>
-                                  <td className="py-3 px-4 text-center font-semibold text-green-600">
-                                    S/ {session.total_sales_revenue.toFixed(2)}
-                                  </td>
-                                  <td className="py-3 px-4 text-center font-semibold text-blue-600">
-                                    S/ {session.total_rentals_revenue.toFixed(2)}
-                                  </td>
-                                  <td className="py-3 px-4 text-center font-bold text-purple-600">
-                                    S/ {session.total_revenue.toFixed(2)}
-                                  </td>
-                                  <td className="py-3 px-4 text-center font-medium">
-                                    {session.products_sold}
-                                  </td>
-                                  <td className="py-3 px-4 text-center">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                      session.is_active 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-gray-100 text-gray-800'
-                                    }`}>
-                                      {session.is_active ? 'Activa' : 'Finalizada'}
-                                    </span>
-                                  </td>
-                                  <td className="py-3 px-4 text-center">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => loadSessionDetail(session)}
-                                      className="flex items-center gap-1"
-                                    >
-                                      <Eye size={14} />
-                                      Ver Detalle
-                                    </Button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div className="text-right">
+                          <div className="font-bold text-green-600">S/ {product.revenue.toFixed(2)}</div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay sesiones registradas</h3>
-                      <p className="text-gray-600">Las sesiones aparecerán aquí cuando comiences a usar el sistema de control de sesiones en Productos.</p>
-                    </div>
-                  )}
+                    )) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Package size={48} className="mx-auto mb-2 opacity-30" />
+                        <p>No hay datos de productos esta semana</p>
+                      </div>
+                    )}
+                  </div>
                 </CardBody>
               </Card>
-            </>
-          )}
-        </div>
-      </div>
-      </div>
 
-      {/* Modal Detalle de Sesión */}
-      <Dialog open={showSessionDetail} onOpenChange={setShowSessionDetail}>
-        <DialogContent className="!max-w-6xl max-h-[90vh] overflow-hidden flex flex-col mx-2 sm:mx-4 md:mx-6">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Activity size={24} />
-              Detalle de Sesión: {selectedSession?.session.session_name}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedSession && (
-            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-              {/* Resumen de la Sesión */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Duración</p>
-                    <p className="text-lg font-bold text-blue-600">{selectedSession.session.duration}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Ingresos Totales</p>
-                    <p className="text-lg font-bold text-green-600">S/ {selectedSession.session.total_revenue.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Productos Vendidos</p>
-                    <p className="text-lg font-bold text-purple-600">{selectedSession.session.products_sold}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">Mesas Rentadas</p>
-                    <p className="text-lg font-bold text-orange-600">{selectedSession.session.rentals_completed}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Reporte de Stock */}
-              {selectedSession.stockReport.length > 0 && (
-                <div className="bg-white border rounded-lg mb-6">
-                  <div className="p-4 border-b bg-purple-50">
-                    <h3 className="text-lg font-bold text-purple-800 flex items-center gap-2">
-                      <Package size={20} />
-                      Reporte de Stock ({selectedSession.stockReport.length} productos)
-                    </h3>
-                    <p className="text-sm text-purple-600">Stock inicial vs final de la sesión</p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    {/* Vista móvil - Cards */}
-                    <div className="md:hidden divide-y">
-                      {selectedSession.stockReport.map((item, index) => (
-                        <div key={index} className="p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-gray-900">{item.product_name}</h4>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              item.difference === item.sold_quantity 
-                                ? 'bg-green-100 text-green-800' 
-                                : item.difference > item.sold_quantity
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {item.difference === item.sold_quantity ? 'Correcto' : 'Diferencia'}
-                            </span>
+              {/* Top Trabajadores */}
+              <Card>
+                <CardHeader>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    👥 Top Trabajadores (Esta Semana)
+                  </h2>
+                </CardHeader>
+                <CardBody>
+                  <div className="space-y-4">
+                    {stats.top_workers.length > 0 ? stats.top_workers.map((worker, idx) => (
+                      <div key={worker.username} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {idx + 1}
                           </div>
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <span className="text-gray-600">Stock Inicial:</span>
-                              <p className="font-bold text-blue-600">{item.initial_stock}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Stock Final:</span>
-                              <p className="font-bold text-purple-600">{item.final_stock}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Vendido:</span>
-                              <p className="font-bold text-green-600">{item.sold_quantity}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-600">Diferencia:</span>
-                              <p className={`font-bold ${
-                                item.difference === item.sold_quantity 
-                                  ? 'text-green-600' 
-                                  : 'text-red-600'
-                              }`}>
-                                {item.difference}
-                              </p>
-                            </div>
+                          <div>
+                            <p className="font-semibold">{worker.username}</p>
+                            <p className="text-sm text-gray-600">{worker.sales_count} ventas</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    
-                    {/* Vista desktop - Tabla */}
-                    <div className="hidden md:block">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Producto</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Stock Inicial</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Stock Final</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Vendido</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Diferencia</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-600">Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {selectedSession.stockReport.map((item, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-medium text-gray-900">{item.product_name}</td>
-                              <td className="px-4 py-3 text-center font-bold text-blue-600">{item.initial_stock}</td>
-                              <td className="px-4 py-3 text-center font-bold text-purple-600">{item.final_stock}</td>
-                              <td className="px-4 py-3 text-center font-bold text-green-600">{item.sold_quantity}</td>
-                              <td className={`px-4 py-3 text-center font-bold ${
-                                item.difference === item.sold_quantity ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {item.difference}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  item.difference === item.sold_quantity 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : item.difference > item.sold_quantity
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {item.difference === item.sold_quantity ? 'Correcto' : 
-                                   item.difference > item.sold_quantity ? 'Faltante' : 'Sobrante'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        <div className="text-right">
+                          <div className="font-bold text-blue-600">S/ {worker.revenue.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users size={48} className="mx-auto mb-2 opacity-30" />
+                        <p>No hay datos de trabajadores esta semana</p>
+                      </div>
+                    )}
                   </div>
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal de Exportación */}
+        <Dialog open={showExportModal} onOpenChange={setShowExportModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Download size={24} />
+                Exportar Reporte
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                Genera un reporte profesional con los datos de tu negocio:
+              </div>
+              
+              {tenantConfig && (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="font-semibold text-blue-900">{tenantConfig.business_name}</p>
+                  {tenantConfig.ruc && (
+                    <p className="text-sm text-blue-700">RUC: {tenantConfig.ruc}</p>
+                  )}
+                  <p className="text-xs text-blue-600 mt-1">
+                    Fecha: {new Date().toLocaleDateString('es-PE')}
+                  </p>
                 </div>
               )}
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Ventas Detalladas */}
-                <div className="bg-white border rounded-lg">
-                  <div className="p-4 border-b bg-green-50">
-                    <h3 className="text-lg font-bold text-green-800 flex items-center gap-2">
-                      <ShoppingCart size={20} />
-                      Ventas de Productos ({selectedSession.sales.length})
-                    </h3>
-                    <p className="text-sm text-green-600">Total: S/ {selectedSession.session.total_sales_revenue.toFixed(2)}</p>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {selectedSession.sales.length > 0 ? (
-                      <div className="divide-y">
-                        {selectedSession.sales.map((sale) => (
-                          <div key={sale.id} className="p-4 hover:bg-gray-50">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <p className="font-semibold text-gray-900">{sale.products?.name || 'Producto N/A'}</p>
-                                <p className="text-sm text-gray-600">Cantidad: {sale.quantity}</p>
-                              </div>
-                              <p className="font-bold text-green-600">S/ {Number(sale.total_amount).toFixed(2)}</p>
-                            </div>
-                            <div className="text-xs text-gray-500 space-y-1">
-                              <p>Cliente: {sale.clients?.name || 'Cliente Anónimo'}</p>
-                              <p>Vendedor: {sale.users?.username || 'N/A'}</p>
-                              <p>Fecha: {new Date(sale.created_at).toLocaleString('es-PE')}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center text-gray-500">
-                        <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
-                        <p>No hay ventas registradas en esta sesión</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Rentas Detalladas */}
-                <div className="bg-white border rounded-lg">
-                  <div className="p-4 border-b bg-blue-50">
-                    <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2">
-                      <Clock size={20} />
-                      Rentas de Mesas ({selectedSession.rentals.length})
-                    </h3>
-                    <p className="text-sm text-blue-600">Total: S/ {selectedSession.session.total_rentals_revenue.toFixed(2)}</p>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {selectedSession.rentals.length > 0 ? (
-                      <div className="divide-y">
-                        {selectedSession.rentals.map((rental) => (
-                          <div key={rental.id} className="p-4 hover:bg-gray-50">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <p className="font-semibold text-gray-900">{rental.tables?.name || 'Mesa N/A'}</p>
-                                <p className="text-sm text-gray-600">
-                                  Duración: {(() => {
-                                    const start = new Date(rental.start_time);
-                                    const end = new Date(rental.end_time);
-                                    const diffMs = end.getTime() - start.getTime();
-                                    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                                    return `${hours}h ${minutes}m`;
-                                  })()}
-                                </p>
-                              </div>
-                              <p className="font-bold text-blue-600">S/ {Number(rental.total_amount).toFixed(2)}</p>
-                            </div>
-                            <div className="text-xs text-gray-500 space-y-1">
-                              <p>Cliente: {rental.clients?.name || 'Cliente Anónimo'}</p>
-                              <p>Inicio: {new Date(rental.start_time).toLocaleString('es-PE')}</p>
-                              <p>Fin: {new Date(rental.end_time).toLocaleString('es-PE')}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center text-gray-500">
-                        <Clock size={48} className="mx-auto mb-4 text-gray-300" />
-                        <p>No hay rentas registradas en esta sesión</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  onClick={handleExportToPDF}
+                  disabled={exporting}
+                  className="h-auto flex-col gap-2 p-4"
+                  variant="outline"
+                >
+                  <FileText size={32} />
+                  <span>PDF</span>
+                </Button>
+                <Button
+                  onClick={handleExportToExcel}
+                  disabled={exporting}
+                  className="h-auto flex-col gap-2 p-4"
+                  variant="outline"
+                >
+                  <FileSpreadsheet size={32} />
+                  <span>Excel</span>
+                </Button>
               </div>
+              
+              {exporting && (
+                <div className="text-center py-4">
+                  <Activity size={32} className="mx-auto mb-2 animate-spin text-primary" />
+                  <p className="text-sm text-gray-600">Generando reporte...</p>
+                </div>
+              )}
             </div>
-          )}
 
-          <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowSessionDetail(false)}
-            >
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowExportModal(false)}
+                disabled={exporting}
+              >
+                Cancelar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </SidebarProvider>
   );
 }

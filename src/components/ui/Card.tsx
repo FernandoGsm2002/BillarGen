@@ -82,31 +82,70 @@ interface StatCardProps {
 
 export function StatCard({ title, value, subtitle, icon, accent = 'slate', className = '' }: StatCardProps) {
   const accentClasses = {
-    slate: 'border-slate-800 text-slate-800 bg-slate-50',
-    emerald: 'border-emerald-700 text-emerald-700 bg-emerald-50',
-    red: 'border-red-700 text-red-700 bg-red-50',
-    amber: 'border-amber-600 text-amber-600 bg-amber-50',
-    blue: 'border-blue-700 text-blue-700 bg-blue-50'
+    slate: {
+      border: 'border-gray-200',
+      text: 'text-gray-900',
+      bg: 'bg-gradient-to-br from-gray-50 to-white',
+      iconBg: 'bg-gray-100',
+      iconText: 'text-gray-600',
+      hover: 'hover:border-gray-300 hover:shadow-md'
+    },
+    emerald: {
+      border: 'border-gray-200',
+      text: 'text-gray-900',
+      bg: 'bg-gradient-to-br from-gray-50 to-white',
+      iconBg: 'bg-gray-100',
+      iconText: 'text-gray-600',
+      hover: 'hover:border-gray-300 hover:shadow-md'
+    },
+    red: {
+      border: 'border-gray-200',
+      text: 'text-gray-900',
+      bg: 'bg-gradient-to-br from-gray-50 to-white',
+      iconBg: 'bg-gray-100',
+      iconText: 'text-gray-600',
+      hover: 'hover:border-gray-300 hover:shadow-md'
+    },
+    amber: {
+      border: 'border-orange-200',
+      text: 'text-orange-800',
+      bg: 'bg-gradient-to-br from-orange-50 to-white',
+      iconBg: 'bg-orange-100',
+      iconText: 'text-orange-600',
+      hover: 'hover:border-orange-300 hover:shadow-md'
+    },
+    blue: {
+      border: 'border-gray-200',
+      text: 'text-gray-900',
+      bg: 'bg-gradient-to-br from-gray-50 to-white',
+      iconBg: 'bg-gray-100',
+      iconText: 'text-gray-600',
+      hover: 'hover:border-gray-300 hover:shadow-md'
+    }
   };
 
-  const [borderColor, textColor, bgColor] = accentClasses[accent].split(' ');
+  const colors = accentClasses[accent];
 
   return (
-    <Card variant="stat" className={className}>
-      <div className={`p-6 border-l-4 ${borderColor}`}>
-        <div className="flex items-start justify-between gap-4">
+    <div className={`group bg-white rounded-xl border ${colors.border} ${colors.hover} transition-all duration-200 ${className}`}>
+      <div className="p-4 sm:p-5 lg:p-6">
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">{title}</h3>
-            <p className={`text-2xl md:text-3xl font-bold ${textColor} truncate`}>{value}</p>
-            {subtitle && <p className="text-sm text-muted-foreground mt-3 font-medium">{subtitle}</p>}
+            <h3 className="text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wide mb-2 sm:mb-3">{title}</h3>
+            <p className={`text-xl sm:text-2xl lg:text-3xl font-bold ${colors.text} truncate leading-none`}>{value}</p>
+            {subtitle && (
+              <p className="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3 font-medium">{subtitle}</p>
+            )}
           </div>
           {icon && (
-            <div className={`${bgColor} ${textColor} p-4 rounded-xl shrink-0`}>
-              {icon}
+            <div className={`${colors.iconBg} ${colors.iconText} p-3 sm:p-4 rounded-lg shrink-0`}>
+              <div className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center">
+                {icon}
+              </div>
             </div>
           )}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

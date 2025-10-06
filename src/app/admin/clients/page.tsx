@@ -18,6 +18,7 @@ interface ClientWithDebt {
   name: string;
   phone: string | null;
   email: string | null;
+  permitir_fiado: boolean;
   total_debt: number;
   total_purchases: number;
   unpaid_sales: number;
@@ -35,7 +36,7 @@ export default function ClientsPage() {
   const [clientRentals, setClientRentals] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; end_time: string; tables?: { name: string } }>>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', permitir_fiado: true });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -182,9 +183,10 @@ export default function ClientsPage() {
         tenant_id: user.tenant_id,
         name: form.name.trim(),
         phone: form.phone.trim() || null,
-        email: form.email.trim() || null
+        email: form.email.trim() || null,
+        permitir_fiado: form.permitir_fiado
       }]);
-      setForm({ name: '', phone: '', email: '' });
+      setForm({ name: '', phone: '', email: '', permitir_fiado: true });
       setShowCreateModal(false);
       loadClients(user.tenant_id);
     } catch (err) {
@@ -684,6 +686,34 @@ export default function ClientsPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="cliente@ejemplo.com"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Permitir Fiado</label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="permitir_fiado"
+                    checked={form.permitir_fiado === true}
+                    onChange={() => setForm({ ...form, permitir_fiado: true })}
+                    className="w-4 h-4 text-green-600"
+                  />
+                  <span className="text-sm text-green-700 font-medium">SÍ</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="permitir_fiado"
+                    checked={form.permitir_fiado === false}
+                    onChange={() => setForm({ ...form, permitir_fiado: false })}
+                    className="w-4 h-4 text-red-600"
+                  />
+                  <span className="text-sm text-red-700 font-medium">NO</span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Si seleccionas &quot;SÍ&quot;, el cliente podrá realizar compras fiadas (a crédito)
+              </p>
             </div>
             <div className="flex gap-3 justify-end pt-4">
               <Button

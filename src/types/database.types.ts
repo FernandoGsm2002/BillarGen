@@ -20,6 +20,7 @@ export interface Client {
   name: string;
   email: string | null;
   phone: string | null;
+  permitir_fiado: boolean;
   created_at: string;
 }
 
@@ -68,4 +69,33 @@ export interface Sale {
   total_amount: number;
   is_paid: boolean;
   created_at: string;
+}
+
+export interface StockChange {
+  id: number;
+  tenant_id: number;
+  product_id: number;
+  user_id: number | null;
+  change_type: 'increase' | 'decrease' | 'adjustment' | 'sale' | 'initial';
+  quantity_change: number;
+  stock_before: number;
+  stock_after: number;
+  reason: string | null;
+  reference_id: number | null;
+  created_at: string;
+}
+
+export interface TenantConfig {
+  id: number;
+  tenant_id: number;
+  business_name: string | null;
+  ruc: string | null;
+  logo_url: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
 }

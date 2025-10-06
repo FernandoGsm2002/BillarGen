@@ -11,6 +11,10 @@ interface TableCardProps {
   secondaryLabel?: string;
   disabledSecondary?: boolean;
   primaryDisabled?: boolean;
+  salesInfo?: {
+    todayTotal?: number;
+    todayProducts?: number;
+  };
 }
 
 export default function TableCard({
@@ -23,70 +27,90 @@ export default function TableCard({
   secondaryLabel = 'Secundaria',
   disabledSecondary,
   primaryDisabled,
+  salesInfo,
 }: TableCardProps) {
   const isAvailable = status === 'available';
   return (
-    <div className={`relative rounded-2xl overflow-hidden border-4 shadow-2xl bg-card transition-all hover:shadow-3xl hover:scale-[1.02] ${
-      isAvailable ? 'border-green-400' : 'border-red-400'
+    <div className={`bg-white rounded-xl border-2 transition-all hover:shadow-lg ${
+      isAvailable ? 'border-gray-200 hover:border-gray-300' : 'border-gray-300 bg-gray-50'
     }`}>
-      <div className="relative w-full aspect-[4/5] min-h-[320px]">
-        <Image
-          src="/pngs/mesas.png"
-          alt="Mesa de billar"
-          fill
-          priority={false}
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-
-        {/* Info + actions overlay */}
-        <div className="absolute inset-0 p-5 flex flex-col justify-end">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <h3 className="text-2xl md:text-3xl lg:text-4xl font-black text-white drop-shadow-2xl tracking-tight">{name}</h3>
+      <div className="p-4">
+        {/* Header con imagen y estado */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+              <Image
+                src="/icons/mesa.ico"
+                alt="Mesa"
+                width={24}
+                height={24}
+                className="object-contain"
+              />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">{name}</h3>
               {typeof hourlyRate === 'number' && (
-                <p className="text-lg md:text-xl lg:text-2xl font-bold text-white drop-shadow-xl">S/ {hourlyRate.toFixed(2)} / hora</p>
-              )}
-            </div>
-            
-            <div className="flex items-center">
-              <span className={`inline-block px-4 py-2 rounded-xl text-sm md:text-base lg:text-lg font-black backdrop-blur-md border-3 shadow-xl ${
-                isAvailable
-                  ? 'bg-green-500 text-white border-green-200'
-                  : 'bg-red-500 text-white border-red-200'
-              }`}>
-                {isAvailable ? '✓ Disponible' : '✗ Ocupada'}
-              </span>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={onPrimary}
-                disabled={primaryDisabled}
-                className={`flex-1 px-5 py-3.5 text-base md:text-lg font-black rounded-xl transition-all border-3 shadow-xl ${
-                  primaryDisabled
-                    ? 'bg-slate-400 text-slate-600 border-slate-400 cursor-not-allowed'
-                    : 'bg-slate-900 text-white hover:bg-slate-800 border-slate-700 hover:shadow-2xl active:scale-95'
-                }`}
-              >
-                {primaryLabel}
-              </button>
-              {secondaryLabel && (
-                <button
-                  onClick={onSecondary}
-                  disabled={disabledSecondary}
-                  className={`flex-1 px-5 py-3.5 text-base md:text-lg font-black rounded-xl transition-all border-3 shadow-xl ${
-                    disabledSecondary
-                      ? 'bg-slate-400 text-slate-600 border-slate-400 cursor-not-allowed'
-                      : 'bg-white text-slate-900 hover:bg-slate-100 border-slate-400 hover:shadow-2xl active:scale-95'
-                  }`}
-                >
-                  {secondaryLabel}
-                </button>
+                <p className="text-sm text-gray-600 font-medium">S/ {hourlyRate.toFixed(2)} / hora</p>
               )}
             </div>
           </div>
+          
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            isAvailable
+              ? 'bg-green-100 text-green-800'
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {isAvailable ? 'Disponible' : 'Ocupada'}
+          </div>
+        </div>
+
+        {/* Información de ventas */}
+        {salesInfo && (salesInfo.todayTotal || salesInfo.todayProducts) && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Ventas de Hoy</h4>
+            <div className="flex justify-between text-sm">
+              {salesInfo.todayTotal !== undefined && (
+                <div>
+                  <p className="text-gray-600">Total</p>
+                  <p className="font-bold text-gray-900">S/ {salesInfo.todayTotal.toFixed(2)}</p>
+                </div>
+              )}
+              {salesInfo.todayProducts !== undefined && (
+                <div>
+                  <p className="text-gray-600">Productos</p>
+                  <p className="font-bold text-gray-900">{salesInfo.todayProducts}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Botones de acción */}
+        <div className="flex gap-2">
+          <button
+            onClick={onPrimary}
+            disabled={primaryDisabled}
+            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+              primaryDisabled
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-800 text-white hover:bg-gray-900'
+            }`}
+          >
+            {primaryLabel}
+          </button>
+          {secondaryLabel && (
+            <button
+              onClick={onSecondary}
+              disabled={disabledSecondary}
+              className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${
+                disabledSecondary
+                  ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+              }`}
+            >
+              {secondaryLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

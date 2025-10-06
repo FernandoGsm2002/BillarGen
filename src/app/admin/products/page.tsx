@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Product } from '@/types/database.types';
+import { recordStockChange } from '@/lib/stockUtils';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import ProductCard from '@/components/ProductCard';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
-import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X, BarChart3, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X, BarChart3, Calendar, History, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import Image from 'next/image';
 
 const AVAILABLE_IMAGES = [
@@ -39,8 +40,21 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showStockHistoryModal, setShowStockHistoryModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
+  const [stockHistory, setStockHistory] = useState<Array<{
+    id: number;
+    change_type: string;
+    quantity_change: number;
+    stock_before: number;
+    stock_after: number;
+    reason: string | null;
+    created_at: string;
+    user_id: number | null;
+    users?: { username: string } | null;
+  }>>([]);
   const [stockReport, setStockReport] = useState<Array<{
     product: Product;
     initial_stock: number;
@@ -151,27 +165,64 @@ export default function ProductsPage() {
     if (!user) return;
 
     try {
+      const newStock = parseInt(formData.stock);
+      
       if (editingProduct) {
+        const oldStock = editingProduct.stock;
+        const stockChange = newStock - oldStock;
+        
         await supabase
           .from('products')
           .update({
             name: formData.name,
             price: parseFloat(formData.price),
-            stock: parseInt(formData.stock),
+            stock: newStock,
             image_url: formData.image_url
           })
           .eq('id', editingProduct.id);
+
+        // Registrar cambio de stock si hubo modificación
+        if (stockChange !== 0) {
+          await recordStockChange({
+            tenantId: user.tenant_id,
+            productId: editingProduct.id,
+            userId: user.id,
+            changeType: stockChange > 0 ? 'increase' : 'adjustment',
+            quantityChange: stockChange,
+            stockBefore: oldStock,
+            stockAfter: newStock,
+            reason: stockChange > 0 
+              ? `Aumento de stock: +${stockChange} unidades` 
+              : `Ajuste de stock: ${stockChange} unidades`
+          });
+        }
       } else {
-        await supabase
+        const { data: newProduct } = await supabase
           .from('products')
           .insert([{
             name: formData.name,
             price: parseFloat(formData.price),
-            stock: parseInt(formData.stock),
+            stock: newStock,
             image_url: formData.image_url,
             tenant_id: user.tenant_id,
             is_active: true
-          }]);
+          }])
+          .select()
+          .single();
+
+        // Registrar stock inicial del nuevo producto
+        if (newProduct && newStock > 0) {
+          await recordStockChange({
+            tenantId: user.tenant_id,
+            productId: newProduct.id,
+            userId: user.id,
+            changeType: 'initial',
+            quantityChange: newStock,
+            stockBefore: 0,
+            stockAfter: newStock,
+            reason: `Stock inicial del producto: ${newStock} unidades`
+          });
+        }
       }
 
       setFormData({ name: '', price: '', stock: '0', image_url: '/pngs/pilsen.png' });
@@ -453,6 +504,34 @@ export default function ProductsPage() {
 
     setStockReport(report);
     setShowStockModal(true);
+  };
+
+  const loadStockHistory = async (product: Product) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('stock_changes')
+        .select(`
+          *,
+          users:user_id (username)
+        `)
+        .eq('tenant_id', user.tenant_id)
+        .eq('product_id', product.id)
+        .order('created_at', { ascending: false })
+        .limit(50); // Últimos 50 cambios
+
+      if (error) {
+        console.error('Error cargando historial de stock:', error);
+        return;
+      }
+
+      setStockHistory(data || []);
+      setSelectedProductForHistory(product);
+      setShowStockHistoryModal(true);
+    } catch (error) {
+      console.error('Error en loadStockHistory:', error);
+    }
   };
 
   const calculateSessionFinancials = async (sessionEndTime: string) => {
@@ -971,6 +1050,7 @@ export default function ProductsPage() {
                     <TableHead className="text-center w-20">Actual</TableHead>
                     <TableHead className="text-center w-20">Dif.</TableHead>
                     <TableHead className="text-center w-24">Estado</TableHead>
+                    <TableHead className="text-center w-24">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1030,6 +1110,17 @@ export default function ProductsPage() {
                          item.difference < 0 ? 'Faltante' : 'Sobrante'}
                       </span>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => loadStockHistory(item.product)}
+                        className="h-8"
+                        title="Ver historial de cambios"
+                      >
+                        <History size={16} />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 </TableBody>
@@ -1071,6 +1162,173 @@ export default function ProductsPage() {
             <Button
               variant="outline"
               onClick={() => setShowStockModal(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Historial de Cambios de Stock */}
+      <Dialog open={showStockHistoryModal} onOpenChange={setShowStockHistoryModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col mx-2 sm:mx-4">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <History size={24} />
+              Historial de Stock - {selectedProductForHistory?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+            {selectedProductForHistory && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-4">
+                  <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-white">
+                    {selectedProductForHistory.image_url ? (
+                      <Image
+                        src={selectedProductForHistory.image_url}
+                        alt={selectedProductForHistory.name}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <PackageIcon size={32} className="text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-900">{selectedProductForHistory.name}</h3>
+                    <div className="flex gap-4 mt-2">
+                      <div>
+                        <span className="text-sm text-gray-600">Stock Actual: </span>
+                        <span className="font-bold text-green-600">{selectedProductForHistory.stock}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Precio: </span>
+                        <span className="font-bold text-blue-600">S/ {selectedProductForHistory.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="text-sm text-muted-foreground">
+              Registro completo de todos los cambios en el stock de este producto (últimos 50 movimientos).
+            </div>
+
+            {stockHistory.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-white z-10">
+                    <TableRow>
+                      <TableHead className="w-32">Fecha/Hora</TableHead>
+                      <TableHead className="w-28">Tipo</TableHead>
+                      <TableHead className="text-center w-20">Anterior</TableHead>
+                      <TableHead className="text-center w-20">Cambio</TableHead>
+                      <TableHead className="text-center w-20">Nuevo</TableHead>
+                      <TableHead className="w-24">Usuario</TableHead>
+                      <TableHead>Razón</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stockHistory.map((change) => {
+                      const changeTypeLabels: Record<string, { label: string; color: string }> = {
+                        'increase': { label: 'Aumento', color: 'bg-green-100 text-green-800' },
+                        'decrease': { label: 'Disminución', color: 'bg-red-100 text-red-800' },
+                        'adjustment': { label: 'Ajuste', color: 'bg-yellow-100 text-yellow-800' },
+                        'sale': { label: 'Venta', color: 'bg-blue-100 text-blue-800' },
+                        'initial': { label: 'Inicial', color: 'bg-purple-100 text-purple-800' }
+                      };
+                      const typeInfo = changeTypeLabels[change.change_type] || { label: change.change_type, color: 'bg-gray-100 text-gray-800' };
+                      
+                      return (
+                        <TableRow key={change.id}>
+                          <TableCell className="text-xs">
+                            {new Date(change.created_at).toLocaleString('es-PE', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${typeInfo.color}`}>
+                              {typeInfo.label}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-semibold text-gray-600">{change.stock_before}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-bold ${
+                              change.quantity_change > 0 ? 'text-green-600' : 
+                              change.quantity_change < 0 ? 'text-red-600' : 'text-gray-600'
+                            }`}>
+                              {change.quantity_change > 0 ? '+' : ''}{change.quantity_change}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-semibold text-blue-600">{change.stock_after}</span>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                              {change.users?.username || 'Sistema'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-700">
+                            {change.reason || 'Sin descripción'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 border rounded-lg bg-gray-50">
+                <History size={48} className="mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay historial de cambios</h3>
+                <p className="text-gray-600">Este producto aún no tiene cambios registrados en el stock.</p>
+              </div>
+            )}
+
+            {stockHistory.length > 0 && (
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Resumen del Historial:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Total de movimientos: </span>
+                    <span className="font-semibold">{stockHistory.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total aumentos: </span>
+                    <span className="font-semibold text-green-600">
+                      +{stockHistory.filter(h => h.quantity_change > 0).reduce((sum, h) => sum + h.quantity_change, 0)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total disminuciones: </span>
+                    <span className="font-semibold text-red-600">
+                      {stockHistory.filter(h => h.quantity_change < 0).reduce((sum, h) => sum + h.quantity_change, 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowStockHistoryModal(false);
+                setSelectedProductForHistory(null);
+                setStockHistory([]);
+              }}
             >
               Cerrar
             </Button>
