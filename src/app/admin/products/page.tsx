@@ -21,6 +21,7 @@ const AVAILABLE_IMAGES = [
   { value: '/pngs/corona.png', label: 'Corona' },
   { value: '/pngs/heineken.png', label: 'Heineken' },
   { value: '/pngs/cristal.png', label: 'Cristal' },
+  { value: '/pngs/cusqueña.png', label: 'Cusqueña' },
   { value: '/pngs/lacapilla.png', label: 'La Capilla' },
   { value: '/pngs/cigarro.png', label: 'Cigarro' },
   { value: '/pngs/halls.png', label: 'Halls' },
@@ -889,98 +890,104 @@ export default function ProductsPage() {
 
       {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-0">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">
               {editingProduct ? 'Editar Producto' : 'Agregar Producto'}
             </DialogTitle>
           </DialogHeader>
           
-          <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Nombre del Producto</label>
-          <Input
-            value={formData.name}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="Ej: Cerveza Pilsen"
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4 mt-4">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Precio</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre del Producto</label>
               <Input
-                type="number"
-                step="0.01"
-                value={formData.price}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, price: e.target.value })}
-                placeholder="10.00"
+                value={formData.name}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Ej: Cerveza Pilsen"
                 required
+                className="w-full"
               />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Precio (S/)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="10.00"
+                  required
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Stock</label>
+                <Input
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, stock: e.target.value })}
+                  placeholder="50"
+                  required
+                  className="w-full"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Stock</label>
-              <Input
-                type="number"
-                value={formData.stock}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, stock: e.target.value })}
-                placeholder="50"
-                required
-              />
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Imagen del Producto
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto border border-gray-200 rounded-lg p-2">
+                {AVAILABLE_IMAGES.map((img) => (
+                  <button
+                    key={img.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, image_url: img.value })}
+                    className={`
+                      relative rounded-lg overflow-hidden border-2 transition-all bg-white p-2 sm:p-3 flex flex-col items-center gap-1 sm:gap-2
+                      ${formData.image_url === img.value 
+                        ? 'border-gray-800 bg-gray-50 scale-105' 
+                        : 'border-gray-200 hover:border-gray-300'
+                      }
+                    `}
+                  >
+                    <div className="relative w-full h-16 sm:h-20 md:h-24">
+                      <Image
+                        src={img.value}
+                        alt={img.label}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 640px) 120px, (max-width: 768px) 150px, 200px"
+                      />
+                    </div>
+                    <div className="text-gray-900 text-xs sm:text-sm text-center font-medium leading-tight">
+                      {img.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4">
-            <label className="block text-sm font-bold text-gray-800 mb-2">
-              Imagen del Producto
-            </label>
-            <div className="grid grid-cols-3 gap-4 max-h-[500px] overflow-y-auto p-2">
-              {AVAILABLE_IMAGES.map((img) => (
-                <button
-                  key={img.value}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, image_url: img.value })}
-                  className={`
-                    relative rounded-lg overflow-hidden border-4 transition-all bg-white p-4 flex flex-col items-center gap-3
-                    ${formData.image_url === img.value 
-                      ? 'border-indigo-600 scale-105 shadow-lg' 
-                      : 'border-gray-200 hover:border-indigo-300'
-                    }
-                  `}
-                >
-                  <div className="relative w-full h-40">
-                    <Image
-                      src={img.value}
-                      alt={img.label}
-                      fill
-                      className="object-contain"
-                      sizes="200px"
-                    />
-                  </div>
-                  <div className="text-gray-900 text-sm text-center font-bold">
-                    {img.label}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowModal(false);
-                setEditingProduct(null);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit">
-              {editingProduct ? 'Actualizar' : 'Crear'} Producto
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowModal(false);
+                  setEditingProduct(null);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                {editingProduct ? 'Actualizar' : 'Crear'} Producto
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

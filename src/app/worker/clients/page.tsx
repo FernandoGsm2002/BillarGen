@@ -185,12 +185,16 @@ export default function WorkerClientsPage() {
         <div className="flex-1 overflow-auto">
           {/* Header */}
           <div className="bg-card border-b">
-            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger className="md:hidden" />
+            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <SidebarTrigger className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors" />
+                <div className="p-3 sm:p-4 bg-gray-100 rounded-xl">
+                  <Users size={28} className="text-gray-700 sm:w-8 sm:h-8" />
+                </div>
                 <div>
-                  <h1 className="text-2xl font-bold">Clientes</h1>
-                  <p className="text-muted-foreground mt-0.5 text-sm font-medium">Consulta y crea clientes</p>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Clientes</h1>
+                  <p className="text-sm text-gray-600 mt-0.5 font-medium hidden sm:block">Consulta y crea clientes</p>
+                  <p className="text-xs text-gray-500 mt-0.5 sm:hidden">Gestión de clientes</p>
                 </div>
               </div>
             </div>

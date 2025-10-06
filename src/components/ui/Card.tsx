@@ -126,13 +126,78 @@ export function StatCard({ title, value, subtitle, icon, accent = 'slate', class
 
   const colors = accentClasses[accent];
 
+  // Función para formatear valores grandes
+  const formatValue = (val: string | number) => {
+    if (typeof val === 'string') {
+      // Si es string, verificar si empieza con "S/" para formatear como moneda
+      if (val.toString().includes('S/')) {
+        const numericValue = parseFloat(val.toString().replace(/[^\d.-]/g, ''));
+        if (!isNaN(numericValue)) {
+          return {
+            display: formatCurrencyValue(numericValue),
+            original: val.toString()
+          };
+        }
+      }
+      return {
+        display: val.toString().length > 12 ? val.toString().slice(0, 10) + '...' : val.toString(),
+        original: val.toString()
+      };
+    }
+
+    if (typeof val === 'number') {
+      return {
+        display: formatNumberValue(val),
+        original: val.toString()
+      };
+    }
+
+    return { display: val, original: val };
+  };
+
+  const formatCurrencyValue = (amount: number) => {
+    if (amount >= 1000000) {
+      return `S/ ${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 10000) {
+      return `S/ ${(amount / 1000).toFixed(1)}K`;
+    } else {
+      return `S/ ${amount.toFixed(2)}`;
+    }
+  };
+
+  const formatNumberValue = (num: number) => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`;
+    } else if (num >= 10000) {
+      return `${(num / 1000).toFixed(1)}K`;
+    } else {
+      return num.toString();
+    }
+  };
+
+  const formattedValue = formatValue(value);
+  const isLargeValue = formattedValue.display !== formattedValue.original;
+
   return (
     <div className={`group bg-white rounded-xl border ${colors.border} ${colors.hover} transition-all duration-200 ${className}`}>
       <div className="p-4 sm:p-5 lg:p-6">
         <div className="flex items-start justify-between gap-3 sm:gap-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wide mb-2 sm:mb-3">{title}</h3>
-            <p className={`text-xl sm:text-2xl lg:text-3xl font-bold ${colors.text} truncate leading-none`}>{value}</p>
+            <div className="space-y-1">
+              <p className={`${
+                isLargeValue 
+                  ? 'text-lg sm:text-xl lg:text-2xl' 
+                  : 'text-xl sm:text-2xl lg:text-3xl'
+              } font-bold ${colors.text} leading-none break-words`}>
+                {formattedValue.display}
+              </p>
+              {isLargeValue && (
+                <p className="text-xs text-gray-500 font-medium">
+                  {formattedValue.original}
+                </p>
+              )}
+            </div>
             {subtitle && (
               <p className="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3 font-medium">{subtitle}</p>
             )}

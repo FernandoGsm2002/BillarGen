@@ -93,117 +93,154 @@ export default function WorkersPage() {
       
       <div className="flex-1 overflow-auto">
         <div className="bg-card border-b">
-          <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="md:hidden" />
-              <div className="p-4 bg-muted rounded-xl">
-                <UsersIcon size={32} />
+          <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <SidebarTrigger className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors" />
+              <div className="p-3 sm:p-4 bg-gray-100 rounded-xl">
+                <UsersIcon size={28} className="text-gray-700 sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Empleados</h1>
-                <p className="text-base text-muted-foreground mt-1">Gestiona los trabajadores</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Empleados</h1>
+                <p className="text-sm sm:text-base text-gray-600 mt-1 hidden sm:block">Gestiona los trabajadores</p>
+                <p className="text-xs text-gray-500 mt-1 sm:hidden">Gestión de personal</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="p-4 md:p-6 lg:p-8">
-          <div className="mb-6">
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8 bg-gray-50 min-h-screen">
+          <div className="mb-4 sm:mb-6">
             <StatCard
               title="Total Empleados"
               value={workers.length}
               accent="slate"
               icon={<UsersIcon size={40} />}
-              className="max-w-sm"
+              className="w-full sm:max-w-sm"
             />
           </div>
           
-          <div className="flex justify-end mb-6">
-
+          <div className="flex justify-end mb-4 sm:mb-6">
             <Button
               size="lg"
               onClick={() => setShowModal(true)}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               <Plus size={20} />
-              Agregar Empleado
+              <span className="hidden sm:inline">Agregar Empleado</span>
+              <span className="sm:hidden">Agregar</span>
             </Button>
           </div>
 
-          <Card>
+          {/* Tabla Desktop */}
+          <Card className="hidden md:block">
             <CardBody className="p-0">
-              <table className="min-w-full">
-                <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usuario
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha de Creación
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {workers.map((worker) => (
-                  <tr key={worker.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-muted rounded-lg">
-                          <UsersIcon size={20} />
-                        </div>
-                        <span className="font-semibold text-base">{worker.username}</span>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Usuario
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Fecha de Creación
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {workers.map((worker) => (
+                      <tr key={worker.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gray-100 rounded-lg">
+                              <UsersIcon size={20} className="text-gray-600" />
+                            </div>
+                            <span className="font-semibold text-base">{worker.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(worker.created_at).toLocaleDateString('es-PE')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDelete(worker.id)}
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 size={18} />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Cards Mobile */}
+          <div className="md:hidden space-y-3">
+            {workers.map((worker) => (
+              <Card key={worker.id} className="bg-white border border-gray-200">
+                <CardBody className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="p-2 bg-gray-100 rounded-lg shrink-0">
+                        <UsersIcon size={20} className="text-gray-600" />
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(worker.created_at).toLocaleDateString('es-PE')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDelete(worker.id)}
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 size={18} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardBody>
-        </Card>
-        {workers.length === 0 && (
-          <div className="text-center py-16">
-            <UsersIcon size={64} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No hay empleados</h3>
-            <p className="text-gray-700 mb-6 font-medium">Comienza agregando tu primer empleado</p>
-            <Button
-              size="lg"
-              onClick={() => setShowModal(true)}
-              className="gap-2"
-            >
-              <Plus size={20} />
-              Agregar Empleado
-            </Button>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-base text-gray-900 truncate">{worker.username}</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          📅 {new Date(worker.created_at).toLocaleDateString('es-PE')}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDelete(worker.id)}
+                      className="h-8 w-8 text-destructive hover:text-destructive ml-2 shrink-0"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
           </div>
+        {workers.length === 0 && (
+          <Card className="bg-white border border-gray-200">
+            <CardBody className="text-center py-12 sm:py-16">
+              <UsersIcon size={48} className="mx-auto text-gray-400 mb-4 sm:w-16 sm:h-16" />
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No hay empleados</h3>
+              <p className="text-gray-600 mb-6 text-sm sm:text-base">Comienza agregando tu primer empleado</p>
+              <Button
+                size="lg"
+                onClick={() => setShowModal(true)}
+                className="gap-2 w-full sm:w-auto"
+              >
+                <Plus size={20} />
+                Agregar Empleado
+              </Button>
+            </CardBody>
+          </Card>
         )}
         </div>
       </div>
 
       {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-md mx-4">
           <DialogHeader>
-            <DialogTitle>Agregar Empleado</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Agregar Empleado</DialogTitle>
           </DialogHeader>
             
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-gray-700">
                 Usuario
               </label>
               <Input
@@ -212,11 +249,12 @@ export default function WorkersPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, username: e.target.value })}
                 required
                 placeholder="Nombre de usuario"
+                className="w-full"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-gray-700">
                 Contraseña
               </label>
               <Input
@@ -225,10 +263,11 @@ export default function WorkersPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
                 required
                 placeholder="Contraseña"
+                className="w-full"
               />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -236,10 +275,11 @@ export default function WorkersPage() {
                   setShowModal(false);
                   setFormData({ username: '', password: '' });
                 }}
+                className="w-full sm:w-auto"
               >
                 Cancelar
               </Button>
-              <Button type="submit">
+              <Button type="submit" className="w-full sm:w-auto">
                 Crear Empleado
               </Button>
             </DialogFooter>

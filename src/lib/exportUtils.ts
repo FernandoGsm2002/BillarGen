@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { TenantConfig } from '@/types/database.types';
 
@@ -50,6 +50,7 @@ export const exportToPDF = async (
   tenantConfig: TenantConfig | null
 ): Promise<void> => {
   try {
+    console.log('📄 Iniciando exportación PDF...');
     const doc = new jsPDF();
     
     // Configuración del documento
@@ -85,7 +86,7 @@ export const exportToPDF = async (
     doc.text('📊 Resumen General', 20, yPosition);
     yPosition += 10;
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [['Métrica', 'Valor']],
       body: [
@@ -110,7 +111,7 @@ export const exportToPDF = async (
     const weeklyChange = ((stats.current_week.total_revenue - stats.previous_week.total_revenue) / stats.previous_week.total_revenue * 100);
     const changeText = weeklyChange >= 0 ? `+${weeklyChange.toFixed(1)}%` : `${weeklyChange.toFixed(1)}%`;
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [['Período', 'Ingresos', 'Productos Vendidos']],
       body: [
@@ -132,7 +133,7 @@ export const exportToPDF = async (
       doc.text('🏆 Top Productos', 20, yPosition);
       yPosition += 10;
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPosition,
         head: [['#', 'Producto', 'Cantidad', 'Ingresos']],
         body: stats.top_products.map((product, index) => [
@@ -162,7 +163,7 @@ export const exportToPDF = async (
       doc.text('👥 Top Trabajadores', 20, yPosition);
       yPosition += 10;
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPosition,
         head: [['#', 'Usuario', 'Ventas', 'Ingresos']],
         body: stats.top_workers.map((worker, index) => [
@@ -192,7 +193,7 @@ export const exportToPDF = async (
       doc.text('📅 Tendencia Diaria (Últimos 7 días)', 20, yPosition);
       yPosition += 10;
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPosition,
         head: [['Fecha', 'Ingresos', 'Productos']],
         body: stats.daily_stats.map(day => [
@@ -220,11 +221,13 @@ export const exportToPDF = async (
 
     // Descargar
     const fileName = `Reporte_${businessName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    console.log('💾 Guardando archivo PDF:', fileName);
     doc.save(fileName);
+    console.log('✅ PDF exportado exitosamente');
 
   } catch (error) {
-    console.error('Error generando PDF:', error);
-    throw new Error('Error al generar el reporte PDF');
+    console.error('❌ Error generando PDF:', error);
+    throw new Error(`Error al generar el reporte PDF: ${error}`);
   }
 };
 
@@ -233,6 +236,7 @@ export const exportToExcel = async (
   tenantConfig: TenantConfig | null
 ): Promise<void> => {
   try {
+    console.log('📊 Iniciando exportación Excel...');
     const businessName = tenantConfig?.business_name || 'Mi Negocio';
     const ruc = tenantConfig?.ruc || 'Sin RUC';
     const reportDate = new Date().toLocaleDateString('es-PE');
@@ -345,10 +349,12 @@ export const exportToExcel = async (
 
     // Descargar
     const fileName = `Reporte_${businessName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    console.log('💾 Guardando archivo Excel:', fileName);
     XLSX.writeFile(wb, fileName);
+    console.log('✅ Excel exportado exitosamente');
 
   } catch (error) {
-    console.error('Error generando Excel:', error);
-    throw new Error('Error al generar el reporte Excel');
+    console.error('❌ Error generando Excel:', error);
+    throw new Error(`Error al generar el reporte Excel: ${error}`);
   }
 };

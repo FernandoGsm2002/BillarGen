@@ -167,15 +167,16 @@ export default function WorkerEarningsPage() {
       
         <div className="flex-1 overflow-auto">
           <div className="bg-card border-b">
-            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger className="md:hidden" />
-                <div className="p-4 bg-muted rounded-xl">
-                  <TrendingUp size={32} />
+            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <SidebarTrigger className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors" />
+                <div className="p-3 sm:p-4 bg-gray-100 rounded-xl">
+                  <TrendingUp size={28} className="text-gray-700 sm:w-8 sm:h-8" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Mis Ingresos</h1>
-                  <p className="text-base text-muted-foreground mt-1">Historial de ventas y rentas</p>
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Mis Ingresos</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1 hidden sm:block">Historial de ventas y rentas</p>
+                  <p className="text-xs text-gray-500 mt-1 sm:hidden">Historial</p>
                 </div>
               </div>
             </div>

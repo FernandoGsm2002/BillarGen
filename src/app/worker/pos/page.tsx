@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Product } from '@/types/database.types';
@@ -9,8 +9,9 @@ import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { ShoppingCart, Plus, Minus, Trash2, Check } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Check, Search } from 'lucide-react';
 
 interface CartItem {
   product: Product;
@@ -42,6 +43,20 @@ export default function POSPage() {
   const [selectedClient, setSelectedClient] = useState<number | null>(null);
   const [isPaid, setIsPaid] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filtrar productos con debounce usando useMemo
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return products;
+    }
+    
+    const term = searchTerm.toLowerCase().trim();
+    return products.filter(product => 
+      product.name.toLowerCase().includes(term) ||
+      product.price.toString().includes(term)
+    );
+  }, [products, searchTerm]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -280,18 +295,58 @@ export default function POSPage() {
                   </div>
                   <h2 className="text-xl md:text-2xl font-bold text-gray-900">Productos Disponibles</h2>
                 </div>
-                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {products.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      name={product.name}
-                      price={product.price}
-                      stock={product.stock}
-                      image_url={product.image_url}
-                      onClick={() => addToCart(product)}
-                      disabled={product.stock === 0}
+                
+                {/* Buscador */}
+                <div className="mb-4 sm:mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <Input
+                      type="text"
+                      placeholder="Buscar productos por nombre o precio..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-12 text-sm sm:text-base bg-gray-50 border-gray-200 rounded-xl focus:border-gray-400 focus:ring-gray-400/20"
                     />
-                  ))}
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  {searchTerm && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                  {filteredProducts.length === 0 ? (
+                    <div className="col-span-full text-center py-8">
+                      <Search size={40} className="mx-auto text-gray-400 mb-3" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {searchTerm ? 'No se encontraron productos' : 'No hay productos disponibles'}
+                      </h3>
+                      <p className="text-gray-600 text-sm">
+                        {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Agrega productos desde el panel de administración'}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        name={product.name}
+                        price={product.price}
+                        stock={product.stock}
+                        image_url={product.image_url}
+                        onClick={() => addToCart(product)}
+                        disabled={product.stock === 0}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -310,7 +365,7 @@ export default function POSPage() {
                     </div>
                   </div>
                 </div>
-                <div className="p-4 sm:p-6">
+                <div className="p-3 sm:p-6">
 
                 {/* Selector de Renta */}
                 {rentals.length > 0 && (
@@ -387,43 +442,52 @@ export default function POSPage() {
                     </div>
                   ) : (
                     cart.map((item) => (
-                      <div key={item.product.id} className="p-3 bg-gray-50 rounded-lg">
+                      <div key={item.product.id} className="p-2 sm:p-3 bg-gray-50 rounded-lg">
                         <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <p className="font-bold text-gray-900">{item.product.name}</p>
-                            <p className="text-sm text-gray-600">S/ {item.product.price.toFixed(2)} c/u</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-900 text-sm sm:text-base truncate">{item.product.name}</p>
+                            <p className="text-xs sm:text-sm text-gray-600">S/ {item.product.price.toFixed(2)} c/u</p>
                           </div>
                           <Button
                             size="icon"
                             variant="ghost"
                             onClick={() => removeFromCart(item.product.id)}
-                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            className="h-6 w-6 sm:h-8 sm:w-8 text-destructive hover:text-destructive ml-1"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </Button>
                         </div>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
                             <Button
                               size="icon"
                               variant="outline"
                               onClick={() => updateQuantity(item.product.id, -1)}
-                              className="h-8 w-8"
+                              className="h-6 w-6 sm:h-8 sm:w-8"
                             >
-                              <Minus size={14} />
+                              <Minus size={12} />
                             </Button>
-                            <span className="w-12 text-center font-bold">{item.quantity}</span>
+                            <span className="w-8 sm:w-12 text-center font-bold text-sm sm:text-base">{item.quantity}</span>
                             <Button
                               size="icon"
                               variant="outline"
                               onClick={() => updateQuantity(item.product.id, 1)}
-                              className="h-8 w-8"
+                              className="h-6 w-6 sm:h-8 sm:w-8"
                             >
-                              <Plus size={14} />
+                              <Plus size={12} />
                             </Button>
                           </div>
-                          <p className="font-bold text-lg text-gray-900">
-                            S/ {(item.product.price * item.quantity).toFixed(2)}
+                          <p className={`font-bold text-gray-900 ${
+                            (item.product.price * item.quantity) >= 1000 
+                              ? 'text-sm sm:text-base' 
+                              : 'text-base sm:text-lg'
+                          }`}>
+                            S/ {(item.product.price * item.quantity) >= 1000 
+                              ? (item.product.price * item.quantity >= 1000000 
+                                  ? `${((item.product.price * item.quantity) / 1000000).toFixed(1)}M`
+                                  : `${((item.product.price * item.quantity) / 1000).toFixed(1)}K`)
+                              : (item.product.price * item.quantity).toFixed(2)
+                            }
                           </p>
                         </div>
                       </div>
@@ -435,12 +499,28 @@ export default function POSPage() {
                 {cart.length > 0 && (
                   <>
                     <div className="border-t-2 border-gray-300 pt-4 mb-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xl font-bold text-gray-900">TOTAL:</span>
-                        <span className="text-3xl font-bold text-gray-900">
-                          S/ {calculateTotal().toFixed(2)}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-lg sm:text-xl font-bold text-gray-900">TOTAL:</span>
+                        <span className={`font-bold text-gray-900 ${
+                          calculateTotal() >= 1000 
+                            ? 'text-xl sm:text-2xl' 
+                            : 'text-2xl sm:text-3xl'
+                        } text-right`}>
+                          S/ {calculateTotal() >= 1000 
+                            ? (calculateTotal() >= 1000000 
+                                ? `${(calculateTotal() / 1000000).toFixed(1)}M`
+                                : `${(calculateTotal() / 1000).toFixed(1)}K`)
+                            : calculateTotal().toFixed(2)
+                          }
                         </span>
                       </div>
+                      {calculateTotal() >= 1000 && (
+                        <div className="text-right">
+                          <span className="text-xs text-gray-500">
+                            (S/ {calculateTotal().toFixed(2)})
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <Button

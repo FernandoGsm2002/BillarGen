@@ -32,6 +32,7 @@ export default function WorkerTablesPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [endingRental, setEndingRental] = useState<RentalWithDetails | null>(null);
   const [rentalSales, setRentalSales] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; quantity: number; products?: { name: string } }>>([]);
+  const [tableSales, setTableSales] = useState<Record<number, { todayTotal: number; todayProducts: number }>>({});
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -82,9 +83,49 @@ export default function WorkerTablesPage() {
       .eq('tenant_id', tenantId)
       .order('name', { ascending: true });
 
+    // Cargar ventas de hoy por mesa
+    if (tablesData && tablesData.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const salesByTable: Record<number, { todayTotal: number; todayProducts: number }> = {};
+      
+      for (const table of tablesData) {
+        // Obtener ventas de hoy para esta mesa específica
+        const { data: salesData } = await supabase
+          .from('sales')
+          .select('total_amount, quantity')
+          .eq('tenant_id', tenantId)
+          .gte('created_at', `${today}T00:00:00.000Z`)
+          .lte('created_at', `${today}T23:59:59.999Z`)
+          .not('rental_id', 'is', null)
+          .in('rental_id', await getTableRentalIds(table.id, tenantId));
+
+        const todayTotal = salesData?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
+        const todayProducts = salesData?.reduce((sum, sale) => sum + (sale.quantity || 0), 0) || 0;
+        
+        salesByTable[table.id] = {
+          todayTotal,
+          todayProducts
+        };
+      }
+      
+      setTableSales(salesByTable);
+    }
+
     if (tablesData) setTables(tablesData);
     if (rentalsData) setActiveRentals(rentalsData as RentalWithDetails[]);
     if (clientsData) setClients(clientsData as Client[]);
+  };
+
+  // Función auxiliar para obtener IDs de rentas de una mesa específica
+  const getTableRentalIds = async (tableId: number, tenantId: number): Promise<number[]> => {
+    const { data: rentalIds } = await supabase
+      .from('rentals')
+      .select('id')
+      .eq('table_id', tableId)
+      .eq('tenant_id', tenantId);
+    
+    return rentalIds?.map(r => r.id) || [];
   };
 
   const handleStartRental = (table: Table) => {
@@ -312,6 +353,23 @@ export default function WorkerTablesPage() {
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs font-medium text-white/90">Monto:</span>
                                     <span className="text-lg font-bold text-emerald-300">S/ {amount.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Info de ventas del día */}
+                            {tableSales[table.id] && (tableSales[table.id].todayTotal > 0 || tableSales[table.id].todayProducts > 0) && (
+                              <div className="bg-blue-900/40 backdrop-blur-sm rounded-lg p-3 border border-blue-300/20">
+                                <h4 className="text-xs font-semibold text-blue-200 uppercase tracking-wide mb-2">Ventas de Hoy</h4>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-white/80">Total:</span>
+                                    <p className="font-bold text-blue-300">S/ {tableSales[table.id].todayTotal.toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-white/80">Productos:</span>
+                                    <p className="font-bold text-blue-300">{tableSales[table.id].todayProducts}</p>
                                   </div>
                                 </div>
                               </div>

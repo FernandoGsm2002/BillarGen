@@ -44,7 +44,28 @@ interface TopWorker {
   revenue: number;
 }
 
-// Interface removida - no se usa actualmente
+interface DailySession {
+  id: number;
+  session_name: string;
+  start_time: string;
+  end_time: string | null;
+  is_active: boolean;
+  tenant_id: number;
+  created_by: number;
+  created_at: string;
+}
+
+interface SessionFinancials {
+  session_id: number;
+  total_sales_revenue: number;
+  total_rentals_revenue: number;
+  total_revenue: number;
+  products_sold: number;
+  rentals_completed: number;
+  average_sale: number;
+  session_duration: string;
+  total_hours: number;
+}
 
 interface ComprehensiveStats {
   // Totales generales
@@ -80,6 +101,11 @@ export default function StatsPage() {
   // const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('week'); // Para uso futuro
   const [exporting, setExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [sessions, setSessions] = useState<DailySession[]>([]);
+  const [selectedSession, setSelectedSession] = useState<DailySession | null>(null);
+  const [sessionFinancials, setSessionFinancials] = useState<SessionFinancials | null>(null);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -97,14 +123,15 @@ export default function StatsPage() {
     setUser(parsedUser);
     loadTenantConfig(parsedUser.tenant_id);
     loadComprehensiveStats(parsedUser.tenant_id);
+    loadDailySessions(parsedUser.tenant_id);
   }, [router]);
 
   const loadTenantConfig = async (tenantId: number) => {
     try {
       const { data, error } = await supabase
         .from('tenant_config')
-        .select('*')
-        .eq('tenant_id', tenantId)
+      .select('*')
+      .eq('tenant_id', tenantId)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -117,6 +144,96 @@ export default function StatsPage() {
       }
     } catch (error) {
       console.error('Error en loadTenantConfig:', error);
+    }
+  };
+
+  const loadDailySessions = async (tenantId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('daily_sessions')
+        .select(`
+          *,
+          users:created_by (username)
+        `)
+        .eq('tenant_id', tenantId)
+        .order('start_time', { ascending: false })
+        .limit(30); // Últimas 30 sesiones
+
+      if (error) {
+        if (error.message.includes('relation "daily_sessions" does not exist')) {
+          console.log('La tabla daily_sessions no existe aún');
+          return;
+        }
+        console.error('Error cargando sesiones:', error);
+        return;
+      }
+
+      if (data) {
+        setSessions(data);
+      }
+    } catch (error) {
+      console.error('Error en loadDailySessions:', error);
+    }
+  };
+
+  const loadSessionFinancials = async (session: DailySession) => {
+    setLoadingSession(true);
+    try {
+      if (!user) return;
+
+      const startDate = new Date(session.start_time);
+      const endDate = session.end_time ? new Date(session.end_time) : new Date();
+
+      // Cargar ventas de la sesión
+            const { data: salesData } = await supabase
+              .from('sales')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+
+      // Cargar rentas de la sesión
+            const { data: rentalsData } = await supabase
+              .from('rentals')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString());
+
+      // Calcular estadísticas
+      const totalSalesRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_amount), 0) || 0;
+      const totalRentalsRevenue = rentalsData?.reduce((sum, rental) => sum + Number(rental.total_amount), 0) || 0;
+      const totalRevenue = totalSalesRevenue + totalRentalsRevenue;
+      const productsSold = salesData?.reduce((sum, sale) => sum + Number(sale.quantity), 0) || 0;
+      const rentalsCompleted = rentalsData?.length || 0;
+      const averageSale = salesData && salesData.length > 0 ? totalSalesRevenue / salesData.length : 0;
+
+            // Calcular duración
+      const duration = endDate.getTime() - startDate.getTime();
+      const hours = Math.floor(duration / (1000 * 60 * 60));
+      const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+      const sessionDuration = hours === 0 && minutes === 0 ? "1m" : `${hours}h ${minutes}m`;
+      const totalHours = Math.max(0.017, hours + (minutes / 60)); // Mínimo 1 minuto = 0.017 horas
+
+      const financials: SessionFinancials = {
+        session_id: session.id,
+        total_sales_revenue: totalSalesRevenue,
+        total_rentals_revenue: totalRentalsRevenue,
+        total_revenue: totalRevenue,
+        products_sold: productsSold,
+        rentals_completed: rentalsCompleted,
+        average_sale: averageSale,
+        session_duration: sessionDuration,
+        total_hours: totalHours
+      };
+
+      setSessionFinancials(financials);
+      setSelectedSession(session);
+      setShowSessionModal(true);
+    } catch (error) {
+      console.error('Error cargando datos de sesión:', error);
+    } finally {
+      setLoadingSession(false);
     }
   };
 
@@ -152,13 +269,13 @@ export default function StatsPage() {
       ] = await Promise.all([
         // Ventas
         supabase
-          .from('sales')
+        .from('sales')
           .select('total_amount, quantity, created_at, products(name, image_url), users(username)')
           .eq('tenant_id', tenantId),
         
         // Rentas
         supabase
-          .from('rentals')
+        .from('rentals')
           .select('total_amount, start_time, end_time')
           .eq('tenant_id', tenantId)
           .not('end_time', 'is', null),
@@ -446,46 +563,52 @@ export default function StatsPage() {
     <SidebarProvider>
       <div className="flex h-screen bg-background">
         <Sidebar role={user.role as 'admin' | 'worker' | 'super_admin'} username={user.username} />
-        
-        <div className="flex-1 overflow-auto">
+      
+      <div className="flex-1 overflow-auto">
           {/* Header */}
-          <div className="bg-card border-b">
-            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <SidebarTrigger className="md:hidden" />
-                  <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl text-white">
-                    <BarChart3 size={32} />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold">Estadísticas</h1>
-                    <p className="text-base text-muted-foreground mt-1">Análisis completo de tu negocio</p>
-                  </div>
+        <div className="bg-card border-b">
+          <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <SidebarTrigger className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors" />
+                <div className="p-3 sm:p-4 bg-gray-100 rounded-xl">
+                  <BarChart3 size={28} className="text-gray-700 sm:w-8 sm:h-8" />
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowExportModal(true)}
-                    className="gap-2"
-                  >
-                    <Download size={20} />
-                    Exportar
-                  </Button>
-                  <Button
-                    onClick={() => loadComprehensiveStats(user.tenant_id)}
-                    className="gap-2"
-                  >
-                    <Activity size={20} />
-                    Actualizar
-                  </Button>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Estadísticas</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1 hidden sm:block">Análisis completo de tu negocio</p>
+                  <p className="text-xs text-gray-500 mt-1 sm:hidden">Análisis del negocio</p>
                 </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExportModal(true)}
+                  className="gap-2 text-xs sm:text-sm px-2 sm:px-4"
+                  size="sm"
+                >
+                  <Download size={16} className="sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Exportar</span>
+                  <span className="sm:hidden">PDF</span>
+                </Button>
+                <Button
+                  onClick={() => loadComprehensiveStats(user.tenant_id)}
+                  className="gap-2 text-xs sm:text-sm px-2 sm:px-4"
+                  size="sm"
+                >
+                  <Activity size={16} className="sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Actualizar</span>
+                  <span className="sm:hidden">↻</span>
+                </Button>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8 bg-gray-50 min-h-screen">
+          <div className="space-y-4 sm:space-y-6">
             {/* Resumen General */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               <StatCard
                 title="Ingresos Totales"
                 value={`S/ ${stats.total_all_time_revenue.toFixed(2)}`}
@@ -518,32 +641,32 @@ export default function StatsPage() {
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   📊 Comparativo Semanal
                 </h2>
-              </CardHeader>
+                  </CardHeader>
               <CardBody>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {/* Semana Actual */}
-                  <div className="bg-gradient-to-br from-green-50 to-blue-50 p-6 rounded-lg border border-green-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 sm:p-6 rounded-lg border border-green-200">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">
                       📅 Semana Actual ({stats.current_week.week})
                     </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Ingresos por Ventas:</span>
                         <span className="font-bold text-green-600">S/ {stats.current_week.sales_revenue.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Ingresos por Rentas:</span>
                         <span className="font-bold text-blue-600">S/ {stats.current_week.rentals_revenue.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between border-t pt-2">
+                      <div className="flex justify-between border-t pt-2 text-sm sm:text-base">
                         <span className="text-gray-900 font-semibold">Total:</span>
-                        <span className="font-bold text-purple-600 text-xl">S/ {stats.current_week.total_revenue.toFixed(2)}</span>
+                        <span className="font-bold text-purple-600 text-lg sm:text-xl">S/ {stats.current_week.total_revenue.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Productos Vendidos:</span>
                         <span className="font-bold">{stats.current_week.products_sold}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Mesas Rentadas:</span>
                         <span className="font-bold">{stats.current_week.rentals_completed}</span>
                       </div>
@@ -551,28 +674,28 @@ export default function StatsPage() {
                   </div>
 
                   {/* Semana Anterior */}
-                  <div className="bg-gradient-to-br from-gray-50 to-slate-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  <div className="bg-gradient-to-br from-gray-50 to-slate-50 p-4 sm:p-6 rounded-lg border border-gray-200">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">
                       📅 Semana Anterior ({stats.previous_week.week})
                     </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Ingresos por Ventas:</span>
                         <span className="font-bold text-gray-700">S/ {stats.previous_week.sales_revenue.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Ingresos por Rentas:</span>
                         <span className="font-bold text-gray-700">S/ {stats.previous_week.rentals_revenue.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
+                    </div>
+                      <div className="flex justify-between border-t pt-2 text-sm sm:text-base">
                         <span className="text-gray-900 font-semibold">Total:</span>
-                        <span className="font-bold text-gray-700 text-xl">S/ {stats.previous_week.total_revenue.toFixed(2)}</span>
+                        <span className="font-bold text-gray-700 text-lg sm:text-xl">S/ {stats.previous_week.total_revenue.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Productos Vendidos:</span>
                         <span className="font-bold text-gray-700">{stats.previous_week.products_sold}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className="text-gray-600">Mesas Rentadas:</span>
                         <span className="font-bold text-gray-700">{stats.previous_week.rentals_completed}</span>
                       </div>
@@ -581,50 +704,50 @@ export default function StatsPage() {
                 </div>
 
                 {/* Indicadores de Cambio */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  <div className={`p-4 rounded-lg text-center ${weeklyRevenueChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      {weeklyRevenueChange >= 0 ? <TrendingUpIcon size={20} /> : <TrendingDown size={20} />}
-                      <span className="font-bold">{weeklyRevenueChange.toFixed(1)}%</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-6">
+                  <div className={`p-3 sm:p-4 rounded-lg text-center ${weeklyRevenueChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="flex items-center justify-center gap-2 mb-1 sm:mb-2">
+                      {weeklyRevenueChange >= 0 ? <TrendingUpIcon size={18} className="sm:w-5 sm:h-5" /> : <TrendingDown size={18} className="sm:w-5 sm:h-5" />}
+                      <span className="font-bold text-sm sm:text-base">{weeklyRevenueChange.toFixed(1)}%</span>
                     </div>
-                    <p className="text-sm font-medium">Cambio en Ingresos</p>
+                    <p className="text-xs sm:text-sm font-medium">Cambio en Ingresos</p>
                   </div>
                   
-                  <div className={`p-4 rounded-lg text-center ${weeklySalesChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      {weeklySalesChange >= 0 ? <TrendingUpIcon size={20} /> : <TrendingDown size={20} />}
-                      <span className="font-bold">{weeklySalesChange.toFixed(1)}%</span>
+                  <div className={`p-3 sm:p-4 rounded-lg text-center ${weeklySalesChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="flex items-center justify-center gap-2 mb-1 sm:mb-2">
+                      {weeklySalesChange >= 0 ? <TrendingUpIcon size={18} className="sm:w-5 sm:h-5" /> : <TrendingDown size={18} className="sm:w-5 sm:h-5" />}
+                      <span className="font-bold text-sm sm:text-base">{weeklySalesChange.toFixed(1)}%</span>
                     </div>
-                    <p className="text-sm font-medium">Cambio en Ventas</p>
-                  </div>
+                    <p className="text-xs sm:text-sm font-medium">Cambio en Ventas</p>
+                    </div>
                   
-                  <div className={`p-4 rounded-lg text-center ${monthlyRevenueChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      {monthlyRevenueChange >= 0 ? <TrendingUpIcon size={20} /> : <TrendingDown size={20} />}
-                      <span className="font-bold">{monthlyRevenueChange.toFixed(1)}%</span>
+                  <div className={`p-3 sm:p-4 rounded-lg text-center ${monthlyRevenueChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="flex items-center justify-center gap-2 mb-1 sm:mb-2">
+                      {monthlyRevenueChange >= 0 ? <TrendingUpIcon size={18} className="sm:w-5 sm:h-5" /> : <TrendingDown size={18} className="sm:w-5 sm:h-5" />}
+                      <span className="font-bold text-sm sm:text-base">{monthlyRevenueChange.toFixed(1)}%</span>
                     </div>
-                    <p className="text-sm font-medium">Cambio Mensual</p>
+                    <p className="text-xs sm:text-sm font-medium">Cambio Mensual</p>
                   </div>
                 </div>
               </CardBody>
             </Card>
 
             {/* Gráfico de Tendencia Diaria */}
-            <Card className="mb-8">
+            <Card className="mb-6 sm:mb-8">
               <CardHeader>
-                <h2 className="text-2xl font-bold flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold flex items-center gap-2">
                   📈 Tendencia Diaria (Últimos 7 días)
                 </h2>
               </CardHeader>
               <CardBody>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {stats.daily_stats.map((day, index) => (
-                    <div key={day.date} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="text-sm font-medium text-gray-600 w-24">
+                    <div key={day.date} className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                        <div className="text-xs sm:text-sm font-medium text-gray-600 w-16 sm:w-24">
                           {new Date(day.date).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                         </div>
-                        <div className="w-48 bg-gray-200 rounded-full h-2">
+                        <div className="flex-1 max-w-32 sm:max-w-48 bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
                             style={{ 
@@ -633,40 +756,40 @@ export default function StatsPage() {
                           ></div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-lg">S/ {day.total_revenue.toFixed(2)}</div>
-                        <div className="text-sm text-gray-600">{day.products_sold} productos</div>
+                      <div className="text-right ml-2">
+                        <div className="font-bold text-sm sm:text-lg">S/ {day.total_revenue.toFixed(2)}</div>
+                        <div className="text-xs sm:text-sm text-gray-600">{day.products_sold} productos</div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardBody>
-            </Card>
+                  </CardBody>
+                </Card>
 
             {/* Top Productos y Trabajadores */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Top Productos */}
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-bold flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                     🏆 Top Productos (Esta Semana)
                   </h2>
                 </CardHeader>
                 <CardBody>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {stats.top_products.length > 0 ? stats.top_products.map((product, idx) => (
-                      <div key={product.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      <div key={product.name} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm shrink-0">
                             {idx + 1}
                           </div>
-                          <div>
-                            <p className="font-semibold">{product.name}</p>
-                            <p className="text-sm text-gray-600">{product.quantity} unidades</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm sm:text-base truncate">{product.name}</p>
+                            <p className="text-xs sm:text-sm text-gray-600">{product.quantity} unidades</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-bold text-green-600">S/ {product.revenue.toFixed(2)}</div>
+                        <div className="text-right ml-2">
+                          <div className="font-bold text-green-600 text-sm sm:text-base">S/ {product.revenue.toFixed(2)}</div>
                         </div>
                       </div>
                     )) : (
@@ -676,61 +799,133 @@ export default function StatsPage() {
                       </div>
                     )}
                   </div>
-                </CardBody>
-              </Card>
+                  </CardBody>
+                </Card>
 
               {/* Top Trabajadores */}
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-bold flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                     👥 Top Trabajadores (Esta Semana)
                   </h2>
                 </CardHeader>
                 <CardBody>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {stats.top_workers.length > 0 ? stats.top_workers.map((worker, idx) => (
-                      <div key={worker.username} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      <div key={worker.username} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm shrink-0">
                             {idx + 1}
                           </div>
-                          <div>
-                            <p className="font-semibold">{worker.username}</p>
-                            <p className="text-sm text-gray-600">{worker.sales_count} ventas</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm sm:text-base truncate">{worker.username}</p>
+                            <p className="text-xs sm:text-sm text-gray-600">{worker.sales_count} ventas</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-bold text-blue-600">S/ {worker.revenue.toFixed(2)}</div>
+                        <div className="text-right ml-2">
+                          <div className="font-bold text-blue-600 text-sm sm:text-base">S/ {worker.revenue.toFixed(2)}</div>
                         </div>
                       </div>
                     )) : (
                       <div className="text-center py-8 text-gray-500">
                         <Users size={48} className="mx-auto mb-2 opacity-30" />
                         <p>No hay datos de trabajadores esta semana</p>
-                      </div>
+                        </div>
                     )}
-                  </div>
+                    </div>
+                  </CardBody>
+                </Card>
+            </div>
+
+            {/* Registro de Sesiones Diarias */}
+            <Card className="mt-4 sm:mt-6">
+              <CardHeader>
+                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                  <Calendar size={20} className="sm:w-6 sm:h-6" />
+                  Registro de Sesiones Diarias
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                  Historial de sesiones de trabajo con resúmenes financieros
+                </p>
+                </CardHeader>
+                <CardBody>
+                  {sessions.length > 0 ? (
+                  <div className="space-y-3">
+                          {sessions.map((session) => (
+                      <div 
+                        key={session.id} 
+                        className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-2 sm:gap-3">
+                              <div className={`w-3 h-3 rounded-full mt-1 shrink-0 ${
+                                session.is_active ? 'bg-green-500' : 'bg-gray-400'
+                              }`} />
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{session.session_name}</h3>
+                                <div className="text-xs sm:text-sm text-gray-600 space-y-1 sm:space-y-0 sm:space-x-4 mt-1">
+                                  <div className="sm:inline">📅 Iniciada: {new Date(session.start_time).toLocaleDateString('es-PE')} {new Date(session.start_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</div>
+                                  {session.end_time && (
+                                    <div className="sm:inline">🏁 Finalizada: {new Date(session.end_time).toLocaleDateString('es-PE')} {new Date(session.end_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</div>
+                                  )}
+                                </div>
+                                <div className="mt-2">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    session.is_active 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {session.is_active ? 'Activa' : 'Finalizada'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 sm:ml-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => loadSessionFinancials(session)}
+                              disabled={loadingSession}
+                              className="flex items-center gap-2 text-xs sm:text-sm w-full sm:w-auto"
+                            >
+                              <Eye size={14} className="sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Ver Detalles</span>
+                              <span className="sm:hidden">Detalles</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+                  ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Calendar size={48} className="mx-auto mb-2 opacity-30" />
+                    <p className="font-medium">No hay sesiones registradas</p>
+                    <p className="text-sm mt-1">Las sesiones aparecerán aquí cuando se creen desde productos</p>
+                    </div>
+                  )}
                 </CardBody>
               </Card>
-            </div>
           </div>
         </div>
 
         {/* Modal de Exportación */}
         <Dialog open={showExportModal} onOpenChange={setShowExportModal}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-[95vw] max-w-md mx-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Download size={24} />
+              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Download size={20} className="sm:w-6 sm:h-6" />
                 Exportar Reporte
               </DialogTitle>
             </DialogHeader>
-            
+          
             <div className="space-y-4">
               <div className="text-sm text-gray-600">
                 Genera un reporte profesional con los datos de tu negocio:
               </div>
-              
+
               {tenantConfig && (
                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="font-semibold text-blue-900">{tenantConfig.business_name}</p>
@@ -739,10 +934,10 @@ export default function StatsPage() {
                   )}
                   <p className="text-xs text-blue-600 mt-1">
                     Fecha: {new Date().toLocaleDateString('es-PE')}
-                  </p>
-                </div>
+                              </p>
+                            </div>
               )}
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   onClick={handleExportToPDF}
@@ -762,27 +957,147 @@ export default function StatsPage() {
                   <FileSpreadsheet size={32} />
                   <span>Excel</span>
                 </Button>
-              </div>
-              
+                    </div>
+                    
               {exporting && (
                 <div className="text-center py-4">
                   <Activity size={32} className="mx-auto mb-2 animate-spin text-primary" />
                   <p className="text-sm text-gray-600">Generando reporte...</p>
                 </div>
               )}
-            </div>
+                  </div>
 
             <DialogFooter>
-              <Button
-                variant="outline"
+            <Button
+              variant="outline"
                 onClick={() => setShowExportModal(false)}
                 disabled={exporting}
-              >
+            >
                 Cancelar
-              </Button>
+            </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Detalles de Sesión */}
+        <Dialog open={showSessionModal} onOpenChange={setShowSessionModal}>
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Calendar size={20} className="sm:w-6 sm:h-6" />
+                <span className="truncate">Detalles de Sesión: {selectedSession?.session_name}</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            {loadingSession ? (
+              <div className="text-center py-8">
+                <Activity size={48} className="mx-auto mb-4 animate-spin text-primary" />
+                <p>Cargando datos de la sesión...</p>
+                  </div>
+            ) : (
+              sessionFinancials && selectedSession && (
+                <div className="space-y-6">
+                  {/* Información de la Sesión */}
+                  <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div>
+                        <h3 className="font-semibold text-blue-900 mb-2 text-sm sm:text-base">📅 Información de Sesión</h3>
+                        <div className="space-y-1 text-xs sm:text-sm text-blue-800">
+                          <p className="break-words">Nombre: <span className="font-medium">{selectedSession.session_name}</span></p>
+                          <p className="break-words">Inicio: <span className="font-medium">{new Date(selectedSession.start_time).toLocaleDateString('es-PE')} {new Date(selectedSession.start_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></p>
+                          {selectedSession.end_time && (
+                            <p className="break-words">Fin: <span className="font-medium">{new Date(selectedSession.end_time).toLocaleDateString('es-PE')} {new Date(selectedSession.end_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></p>
+                          )}
+                          <p>Estado: <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            selectedSession.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {selectedSession.is_active ? 'Activa' : 'Finalizada'}
+                          </span></p>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-blue-900 mb-2 text-sm sm:text-base">⏱️ Duración</h3>
+                        <div className="text-xl sm:text-2xl font-bold text-blue-800">
+                          {sessionFinancials.session_duration}
+                        </div>
+                        <p className="text-xs text-blue-600 mt-1">
+                          {sessionFinancials.total_hours.toFixed(2)} horas totales
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumen Financiero */}
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 sm:p-6 rounded-lg border border-green-200">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                      💰 Resumen Financiero
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
+                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Ingresos por Ventas</p>
+                        <p className="text-xl sm:text-2xl font-bold text-green-600">S/ {sessionFinancials.total_sales_revenue.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">{sessionFinancials.products_sold} productos vendidos</p>
+                      </div>
+                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
+                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Ingresos por Rentas</p>
+                        <p className="text-xl sm:text-2xl font-bold text-blue-600">S/ {sessionFinancials.total_rentals_revenue.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">{sessionFinancials.rentals_completed} mesas rentadas</p>
+                      </div>
+                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
+                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Ingresos Totales</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-purple-600">S/ {sessionFinancials.total_revenue.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
+                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Venta Promedio</p>
+                        <p className="text-xl sm:text-2xl font-bold text-orange-600">S/ {sessionFinancials.average_sale.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Por transacción</p>
+                      </div>
+                          </div>
+                      </div>
+
+                  {/* KPIs de la Sesión */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                    <StatCard
+                      title="Productos Vendidos"
+                      value={sessionFinancials.products_sold}
+                      subtitle="Unidades totales"
+                      icon={<Package size={24} />}
+                      accent="blue"
+                    />
+                    <StatCard
+                      title="Mesas Rentadas"
+                      value={sessionFinancials.rentals_completed}
+                      subtitle="Rentas completadas"
+                      icon={<Users size={24} />}
+                      accent="emerald"
+                    />
+                    <StatCard
+                      title="Ingreso por Hora"
+                      value={`S/ ${(sessionFinancials.total_revenue / sessionFinancials.total_hours).toFixed(2)}`}
+                      subtitle="Promedio por hora"
+                      icon={<TrendingUp size={24} />}
+                      accent="slate"
+                    />
+                      </div>
+                  </div>
+              )
+          )}
+
+            <DialogFooter>
+            <Button
+              variant="outline"
+                onClick={() => {
+                  setShowSessionModal(false);
+                  setSelectedSession(null);
+                  setSessionFinancials(null);
+                }}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </div>
       </div>
     </SidebarProvider>
   );

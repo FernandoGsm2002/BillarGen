@@ -208,80 +208,100 @@ export default function SalesPage() {
 
         <div className="flex-1 overflow-auto">
           {/* Header */}
-          <div className="bg-card border-b">
-            <div className="px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
-              <div className="flex items-center gap-4 mb-2">
-                <SidebarTrigger className="md:hidden" />
-                <h1 className="text-3xl font-bold">Ingresos</h1>
+          <div className="bg-white border-b border-gray-200">
+            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
+              <div className="flex items-center gap-3 sm:gap-4 mb-2">
+                <SidebarTrigger className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <ShoppingCart size={28} className="text-gray-700 sm:w-8 sm:h-8" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Ingresos</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1 hidden sm:block">Historial de Ventas y Alquileres de Mesas</p>
+                  <p className="text-xs text-gray-500 mt-1 sm:hidden">Ventas y alquileres</p>
+                </div>
               </div>
-              <p className="text-base text-muted-foreground mt-1">Historial de Ventas y Alquileres de Mesas</p>
             </div>
           </div>
 
-          <div className="p-4 md:p-6 lg:p-8">
+          <div className="p-3 sm:p-4 md:p-6 lg:p-8 bg-gray-50">
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <StatCard title="Total Ingresos" value={`S/ ${totalIncome.toFixed(2)}`} accent="emerald" icon={<ShoppingCart size={40} />} />
-              <StatCard title="Ventas Productos" value={`S/ ${totalSales.toFixed(2)}`} accent="blue" icon={<Package size={40} />} />
-              <StatCard title="Alquiler Mesas" value={`S/ ${totalRentals.toFixed(2)}`} accent="blue" icon={<Grid3x3 size={40} />} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <StatCard title="Total Ingresos" value={`S/ ${totalIncome.toFixed(2)}`} accent="slate" icon={<ShoppingCart size={40} />} />
+              <StatCard title="Ventas Productos" value={`S/ ${totalSales.toFixed(2)}`} accent="slate" icon={<Package size={40} />} />
+              <StatCard title="Alquiler Mesas" value={`S/ ${totalRentals.toFixed(2)}`} accent="slate" icon={<Grid3x3 size={40} />} />
               <StatCard title="Transacciones" value={allIncomes.length} accent="slate" icon={<Calendar size={40} />} />
             </div>
 
             {/* Filters */}
-            <div className="mb-6 space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant={filter === 'all' ? 'default' : 'ghost'}
-                  onClick={() => handleFilterChange('all')}
-                >
-                  Todas
-                </Button>
-                <Button
-                  variant={filter === 'today' ? 'default' : 'ghost'}
-                  onClick={() => handleFilterChange('today')}
-                >
-                  Hoy
-                </Button>
-                <Button
-                  variant={filter === 'week' ? 'default' : 'ghost'}
-                  onClick={() => handleFilterChange('week')}
-                >
-                  Última Semana
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant={typeFilter === 'all' ? 'default' : 'outline'}
-                  onClick={() => setTypeFilter('all')}
-                  size="sm"
-                >
-                  Todos los Ingresos
-                </Button>
-                <Button
-                  variant={typeFilter === 'sales' ? 'default' : 'outline'}
-                  onClick={() => setTypeFilter('sales')}
-                  size="sm"
-                >
-                  <Package size={16} className="mr-2" />
-                  Solo Ventas
-                </Button>
-                <Button
-                  variant={typeFilter === 'rentals' ? 'default' : 'outline'}
-                  onClick={() => setTypeFilter('rentals')}
-                  size="sm"
-                >
-                  <Grid3x3 size={16} className="mr-2" />
-                  Solo Alquileres
-                </Button>
-                <Button
-                  variant={typeFilter === 'combined' ? 'default' : 'outline'}
-                  onClick={() => setTypeFilter('combined')}
-                  size="sm"
-                >
-                  <Grid3x3 size={16} className="mr-1" />
-                  <Package size={16} className="mr-2" />
-                  Rentas + Consumos
-                </Button>
+            <div className="mb-4 sm:mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtros</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filter === 'all' ? 'default' : 'ghost'}
+                    onClick={() => handleFilterChange('all')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    Todas
+                  </Button>
+                  <Button
+                    variant={filter === 'today' ? 'default' : 'ghost'}
+                    onClick={() => handleFilterChange('today')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    Hoy
+                  </Button>
+                  <Button
+                    variant={filter === 'week' ? 'default' : 'ghost'}
+                    onClick={() => handleFilterChange('week')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    Última Semana
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={typeFilter === 'all' ? 'default' : 'outline'}
+                    onClick={() => setTypeFilter('all')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    variant={typeFilter === 'sales' ? 'default' : 'outline'}
+                    onClick={() => setTypeFilter('sales')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    <Package size={14} className="mr-1 sm:mr-2" />
+                    Ventas
+                  </Button>
+                  <Button
+                    variant={typeFilter === 'rentals' ? 'default' : 'outline'}
+                    onClick={() => setTypeFilter('rentals')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    <Grid3x3 size={14} className="mr-1 sm:mr-2" />
+                    Alquileres
+                  </Button>
+                  <Button
+                    variant={typeFilter === 'combined' ? 'default' : 'outline'}
+                    onClick={() => setTypeFilter('combined')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    <Grid3x3 size={14} className="mr-1" />
+                    <Package size={14} className="mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Rentas + Consumos</span>
+                    <span className="sm:hidden">Combinado</span>
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -353,78 +373,80 @@ export default function SalesPage() {
               </Card>
             )}
 
-            {/* Income Table */}
-            <Card>
+            {/* Income Table - Desktop */}
+            <Card className="hidden md:block">
               <CardBody className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Concepto</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Mesa</TableHead>
-                      <TableHead>Vendedor</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Fecha</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredIncomes.map((income) => (
-                      <TableRow key={income.id}>
-                        <TableCell>
-                          <Badge variant={income.type === 'sale' ? 'default' : 'info'}>
-                            {income.type === 'sale' ? (
-                              <><Package size={14} className="mr-1" /> Venta</>
-                            ) : (
-                              <><Grid3x3 size={14} className="mr-1" /> Alquiler</>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm font-medium text-gray-900">
-                            {income.type === 'sale' ? income.product_name : `Alquiler de ${income.table_name}`}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <User size={20} className="text-gray-400 mr-3" />
-                            <div className="text-sm text-gray-900">
-                              {income.client_name}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm text-gray-900">
-                            {income.table_name}
-                          </div>
-                        </TableCell>
-                        <TableCell>{income.worker}</TableCell>
-                        <TableCell className="font-semibold">{income.quantity || '-'}</TableCell>
-                        <TableCell className="font-bold text-green-600">S/ {income.amount.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Badge variant={income.is_paid ? 'success' : 'danger'}>
-                            {income.is_paid ? (
-                              <><CreditCard size={14} className="mr-1" /> Pagado</>
-                            ) : (
-                              <><AlertCircle size={14} className="mr-1" /> Fiado</>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Calendar size={16} className="mr-2" />
-                            {new Date(income.date).toLocaleDateString('es-PE')}
-                            <span className="ml-2 text-xs">
-                              {new Date(income.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Concepto</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Mesa</TableHead>
+                        <TableHead>Vendedor</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredIncomes.map((income) => (
+                        <TableRow key={income.id}>
+                          <TableCell>
+                            <Badge variant={income.type === 'sale' ? 'default' : 'info'}>
+                              {income.type === 'sale' ? (
+                                <><Package size={14} className="mr-1" /> Venta</>
+                              ) : (
+                                <><Grid3x3 size={14} className="mr-1" /> Alquiler</>
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm font-medium text-gray-900">
+                              {income.type === 'sale' ? income.product_name : `Alquiler de ${income.table_name}`}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <User size={20} className="text-gray-400 mr-3" />
+                              <div className="text-sm text-gray-900">
+                                {income.client_name}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-gray-900">
+                              {income.table_name}
+                            </div>
+                          </TableCell>
+                          <TableCell>{income.worker}</TableCell>
+                          <TableCell className="font-semibold">{income.quantity || '-'}</TableCell>
+                          <TableCell className="font-bold text-gray-900">S/ {income.amount.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge variant={income.is_paid ? 'success' : 'danger'}>
+                              {income.is_paid ? (
+                                <><CreditCard size={14} className="mr-1" /> Pagado</>
+                              ) : (
+                                <><AlertCircle size={14} className="mr-1" /> Fiado</>
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Calendar size={16} className="mr-2" />
+                              {new Date(income.date).toLocaleDateString('es-PE')}
+                              <span className="ml-2 text-xs">
+                                {new Date(income.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
                 {filteredIncomes.length === 0 && (
                   <div className="text-center py-12">
@@ -435,6 +457,81 @@ export default function SalesPage() {
                 )}
               </CardBody>
             </Card>
+
+            {/* Income Cards - Mobile */}
+            <div className="md:hidden space-y-3">
+              {filteredIncomes.length === 0 ? (
+                <Card>
+                  <CardBody>
+                    <div className="text-center py-8">
+                      <ShoppingCart size={40} className="mx-auto text-gray-400 mb-3" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay Ingresos</h3>
+                      <p className="text-gray-600 text-sm">No se han registrado ingresos en este período</p>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : (
+                filteredIncomes.map((income) => (
+                  <Card key={income.id} className="bg-white border border-gray-200">
+                    <CardBody className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <Badge variant={income.type === 'sale' ? 'default' : 'info'}>
+                          {income.type === 'sale' ? (
+                            <><Package size={12} className="mr-1" /> Venta</>
+                          ) : (
+                            <><Grid3x3 size={12} className="mr-1" /> Alquiler</>
+                          )}
+                        </Badge>
+                        <Badge variant={income.is_paid ? 'success' : 'danger'}>
+                          {income.is_paid ? (
+                            <><CreditCard size={12} className="mr-1" /> Pagado</>
+                          ) : (
+                            <><AlertCircle size={12} className="mr-1" /> Fiado</>
+                          )}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {income.type === 'sale' ? income.product_name : `Alquiler de ${income.table_name}`}
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div>
+                            <p className="font-medium">Cliente:</p>
+                            <p className="truncate">{income.client_name}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Mesa:</p>
+                            <p className="truncate">{income.table_name}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Vendedor:</p>
+                            <p className="truncate">{income.worker}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Cantidad:</p>
+                            <p>{income.quantity || '-'}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                          <div className="text-xs text-gray-500 flex items-center">
+                            <Calendar size={12} className="mr-1" />
+                            {new Date(income.date).toLocaleDateString('es-PE')} {new Date(income.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <div className="text-lg font-bold text-gray-900">
+                            S/ {income.amount.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
