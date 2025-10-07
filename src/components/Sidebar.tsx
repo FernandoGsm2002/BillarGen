@@ -94,49 +94,35 @@ export default function Sidebar({ role, username }: SidebarProps) {
   const links = role === 'admin' ? adminLinks : role === 'worker' ? workerLinks : superAdminLinks;
 
   // Usar configuración del tenant o valores por defecto
-  const businessName = tenantConfig?.business_name || 'La Capilla';
+  const businessName = tenantConfig?.business_name || 'BillarExpert';
   const businessType = 'Billar';
-  const logoUrl = tenantConfig?.logo_url || '/pngs/lacapilla.png';
+  const logoUrl = tenantConfig?.logo_url || '/pngs/logologin.png';
 
   return (
     <UiSidebar className="border-r border-gray-200" collapsible="icon">
       <SidebarHeader className="border-b border-gray-200 p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
             {logoUrl ? (
               <Image 
                 src={logoUrl} 
                 alt={businessName} 
-                width={40} 
-                height={40} 
-                className="object-contain"
+                width={64} 
+                height={64} 
+                className="object-contain p-1"
                 onError={(e) => {
                   // Fallback if image fails to load
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             ) : (
-              <Building2 size={24} className="text-gray-600" />
+              <Building2 size={40} className="text-gray-600" />
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold text-gray-900 leading-tight"
-                style={{ 
-                  wordBreak: 'break-word',
-                  hyphens: 'auto',
-                  lineHeight: '1.2'
-                }}>
-              {businessName}
-            </h1>
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">{businessType}</p>
-            {tenantConfig?.ruc && (
-              <p className="text-xs text-gray-400 truncate">RUC: {tenantConfig.ruc}</p>
-            )}
+          <div className="p-3 bg-gray-100 rounded-lg w-full">
+            <p className="text-sm font-semibold text-gray-900 truncate text-center">{username}</p>
+            <p className="text-xs text-gray-600 capitalize mt-1 text-center">{role.replace('_', ' ')}</p>
           </div>
-        </div>
-        <div className="p-3 bg-gray-100 rounded-lg">
-          <p className="text-sm font-semibold text-gray-900 truncate">{username}</p>
-          <p className="text-xs text-gray-600 capitalize mt-1">{role.replace('_', ' ')}</p>
         </div>
       </SidebarHeader>
 

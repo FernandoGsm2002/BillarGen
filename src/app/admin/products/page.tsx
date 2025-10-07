@@ -625,7 +625,7 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-4 lg:p-8 xl:p-12 w-full max-w-[1800px] mx-auto">
           {/* Session Status */}
           {currentSession && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">

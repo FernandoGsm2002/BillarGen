@@ -123,7 +123,164 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
+  
+  html, body {
+    @apply bg-background text-foreground overflow-x-hidden;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-optical-sizing: auto;
+    font-variation-settings: "wght" 400;
+  }
+  
+  /* Enhanced typography for better readability */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    font-variation-settings: "wght" 700;
+  }
+  
+  h1 {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
+    font-weight: 800;
+    font-variation-settings: "wght" 800;
+  }
+  
+  h2 {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+    font-weight: 700;
+  }
+  
+  h3 {
+    @apply text-lg sm:text-xl lg:text-2xl;
+    font-weight: 600;
+  }
+  
+  /* Strong text styling */
+  strong, .font-bold {
+    font-weight: 700;
+    font-variation-settings: "wght" 700;
+  }
+  
+  .font-extrabold {
+    font-weight: 800;
+    font-variation-settings: "wght" 800;
+  }
+  
+  /* Button text enhancement */
+  button {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  
+  /* Card titles */
+  .card-title {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  
+  /* Ensure full height containers */
+  #__next {
+    height: 100vh;
+  }
+  
+  /* Responsive improvements */
+  .container {
+    @apply w-full max-w-full px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Better scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-md;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+  
+  /* Mobile improvements */
+  @media (max-width: 768px) {
+    .responsive-text {
+      @apply text-sm;
+    }
+    
+    .responsive-padding {
+      @apply p-3;
+    }
+    
+    .responsive-gap {
+      @apply gap-3;
+    }
+  }
+  
+  /* Desktop improvements */
+  @media (min-width: 1024px) {
+    .responsive-text {
+      @apply text-base;
+    }
+    
+    .responsive-padding {
+      @apply p-6;
+    }
+    
+    .responsive-gap {
+      @apply gap-6;
+    }
+  }
+  
+  /* Ultra-wide screen optimizations */
+  @media (min-width: 1920px) {
+    .container {
+      @apply max-w-screen-2xl mx-auto;
+    }
+    
+    /* Better spacing for large screens */
+    .dashboard-container {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    /* Improved grid layouts for ultra-wide */
+    .dashboard-grid-large {
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+  }
+  
+  /* Enhanced responsive grid */
+  .dashboard-responsive-grid {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  @media (min-width: 1024px) {
+    .dashboard-responsive-grid {
+      gap: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+  }
+  
+  @media (min-width: 1536px) {
+    .dashboard-responsive-grid {
+      gap: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+  }
+  
+  /* Smooth transitions for responsive elements */
+  .responsive-transition {
+    @apply transition-all duration-200 ease-in-out;
   }
 }

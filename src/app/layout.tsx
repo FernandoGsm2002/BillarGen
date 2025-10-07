@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BillarGen - Sistema de Administración",
+  title: "BillarExpert - Sistema de Administración",
   description: "Sistema multitenant para administración de negocios de billar",
 };
 

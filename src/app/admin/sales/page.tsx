@@ -224,7 +224,7 @@ export default function SalesPage() {
             </div>
           </div>
 
-          <div className="p-3 sm:p-4 md:p-6 lg:p-8 bg-gray-50">
+          <div className="p-4 lg:p-8 xl:p-12 bg-gray-50 w-full max-w-[1800px] mx-auto">
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
               <StatCard title="Total Ingresos" value={`S/ ${totalIncome.toFixed(2)}`} accent="slate" icon={<ShoppingCart size={40} />} />

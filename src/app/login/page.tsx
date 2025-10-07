@@ -79,15 +79,15 @@ export default function LoginPage() {
         <CardBody className="p-8 md:p-10">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <div className="relative w-24 h-24 mb-4 bg-muted rounded-2xl p-3 shadow-sm">
+            <div className="relative w-32 h-32 mb-4 bg-muted rounded-2xl p-4 shadow-sm">
               <Image
-                src="/pngs/lacapilla.png"
-                alt="La Capilla"
+                src="/pngs/logologin.png"
+                alt="BillarExpert"
                 fill
-                className="object-contain p-2"
+                className="object-contain p-1"
               />
             </div>
-            <h1 className="text-3xl font-bold mb-1">La Capilla</h1>
+            <h1 className="text-3xl font-bold mb-1">BillarExpert</h1>
             <p className="text-muted-foreground font-medium">Sistema de Gestión</p>
           </div>
           

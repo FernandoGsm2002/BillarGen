@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserCheck, DollarSign, AlertCircle, Search, Eye, Package, Calendar, Plus } from 'lucide-react';
+import { DateFilters } from '@/components/DateFilters';
 
 interface ClientWithDebt {
   id: number;
@@ -37,6 +38,43 @@ export default function ClientsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', permitir_fiado: true });
+  const [dateFilter, setDateFilter] = useState('all');
+  const [filteredSales, setFilteredSales] = useState<any[]>([]);
+  const [filteredRentals, setFilteredRentals] = useState<any[]>([]);
+
+  // Filtrar ventas y alquileres por fecha
+  const handleDateFilterChange = (filter: string, startDate: Date, endDate: Date) => {
+    setDateFilter(filter);
+    
+    if (filter === 'all') {
+      setFilteredSales(clientSales);
+      setFilteredRentals(clientRentals);
+    } else {
+      const salesFiltered = clientSales.filter(sale => {
+        const saleDate = new Date(sale.created_at);
+        return saleDate >= startDate && saleDate <= endDate;
+      });
+      
+      const rentalsFiltered = clientRentals.filter(rental => {
+        const rentalDate = new Date(rental.end_time);
+        return rentalDate >= startDate && rentalDate <= endDate;
+      });
+      
+      setFilteredSales(salesFiltered);
+      setFilteredRentals(rentalsFiltered);
+    }
+  };
+
+  // Actualizar filtros cuando cambien los datos
+  useEffect(() => {
+    if (dateFilter === 'all') {
+      setFilteredSales(clientSales);
+      setFilteredRentals(clientRentals);
+    } else {
+      // Re-aplicar filtro actual
+      handleDateFilterChange(dateFilter, new Date(), new Date());
+    }
+  }, [clientSales, clientRentals]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -235,7 +273,7 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-4 lg:p-8 xl:p-12 w-full max-w-[1800px] mx-auto">
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             <StatCard
@@ -453,6 +491,15 @@ export default function ClientsPage() {
             </DialogTitle>
           </DialogHeader>
           
+          {/* Filtros de Fecha */}
+          <div className="border-b pb-4">
+            <DateFilters
+              selectedFilter={dateFilter}
+              onFilterChange={handleDateFilterChange}
+              className="justify-start"
+            />
+          </div>
+          
           <div className="space-y-4">
             {/* Resumen */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -471,7 +518,7 @@ export default function ClientsPage() {
             </div>
 
             {/* Tabla de Rentas */}
-            {clientRentals.length > 0 && (
+            {filteredRentals.length > 0 && (
               <div className="border rounded-lg overflow-hidden mb-4">
                 <div className="bg-blue-50 px-4 py-2 border-b">
                   <h3 className="font-bold text-blue-900">Alquileres de Mesas</h3>
@@ -479,7 +526,7 @@ export default function ClientsPage() {
                 
                 {/* Vista móvil - Cards */}
                 <div className="md:hidden divide-y">
-                  {clientRentals.map((rental) => (
+                  {filteredRentals.map((rental) => (
                     <div key={rental.id} className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
@@ -515,7 +562,7 @@ export default function ClientsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {clientRentals.map((rental) => (
+                      {filteredRentals.map((rental) => (
                         <tr key={rental.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 font-medium">{rental.tables?.name || 'N/A'}</td>
                           <td className="px-4 py-3 font-bold text-green-600">S/ {Number(rental.total_amount).toFixed(2)}</td>
@@ -548,11 +595,11 @@ export default function ClientsPage() {
                 <h3 className="font-bold text-green-900">Productos Vendidos</h3>
               </div>
               
-              {clientSales.length > 0 ? (
+              {filteredSales.length > 0 ? (
                 <>
                   {/* Vista móvil - Cards */}
                   <div className="md:hidden divide-y">
-                    {clientSales.map((sale) => (
+                    {filteredSales.map((sale) => (
                       <div key={sale.id} className="p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -606,7 +653,7 @@ export default function ClientsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {clientSales.map((sale) => (
+                        {filteredSales.map((sale) => (
                           <tr key={sale.id} className="hover:bg-muted/30">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
