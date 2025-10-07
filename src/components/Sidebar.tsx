@@ -96,7 +96,7 @@ export default function Sidebar({ role, username }: SidebarProps) {
   // Usar configuración del tenant o valores por defecto
   const businessName = tenantConfig?.business_name || 'BillarExpert';
   const businessType = 'Billar';
-  const logoUrl = tenantConfig?.logo_url || '/pngs/logologin.png';
+  const logoUrl = '/pngs/logologin.png'; // Siempre usar logo por defecto
 
   return (
     <UiSidebar className="border-r border-gray-200" collapsible="icon">

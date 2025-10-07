@@ -9,8 +9,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Settings, Building2, Save, Upload, Image as ImageIcon } from 'lucide-react';
-import Image from 'next/image';
+import { Settings, Building2, Save } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,15 +19,12 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState({
     business_name: '',
     ruc: '',
-    logo_url: '',
     address: '',
     phone: '',
     email: '',
     website: '',
     description: ''
   });
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -65,78 +61,18 @@ export default function SettingsPage() {
         setFormData({
           business_name: data.business_name || '',
           ruc: data.ruc || '',
-          logo_url: data.logo_url || '',
           address: data.address || '',
           phone: data.phone || '',
           email: data.email || '',
           website: data.website || '',
           description: data.description || ''
         });
-        setLogoPreview(data.logo_url);
       }
     } catch (error) {
       console.error('Error en loadConfig:', error);
     }
   };
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        alert('El archivo es demasiado grande. Máximo 2MB.');
-        return;
-      }
-      
-      if (!file.type.startsWith('image/')) {
-        alert('Por favor selecciona una imagen válida.');
-        return;
-      }
-
-      setLogoFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile || !user) return null;
-
-    try {
-      const fileExt = logoFile.name.split('.').pop();
-      const fileName = `${user.tenant_id}-${Date.now()}.${fileExt}`;
-      const filePath = `tenant-logos/${fileName}`;
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('tenant-assets')
-        .upload(filePath, logoFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Error subiendo logo:', uploadError);
-        alert('Error al subir el logo. Asegúrate de que el bucket "tenant-assets" existe en Supabase Storage.');
-        return null;
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('tenant-assets')
-        .getPublicUrl(filePath);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Error en uploadLogo:', error);
-      alert('Error al procesar el logo');
-      return null;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,21 +80,10 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      let logoUrl = formData.logo_url;
-
-      // Upload new logo if selected
-      if (logoFile) {
-        const uploadedUrl = await uploadLogo();
-        if (uploadedUrl) {
-          logoUrl = uploadedUrl;
-        }
-      }
-
       const configData = {
         tenant_id: user.tenant_id,
         business_name: formData.business_name || null,
         ruc: formData.ruc || null,
-        logo_url: logoUrl || null,
         address: formData.address || null,
         phone: formData.phone || null,
         email: formData.email || null,
@@ -186,7 +111,6 @@ export default function SettingsPage() {
 
       alert('✅ Configuración guardada exitosamente');
       loadConfig(user.tenant_id);
-      setLogoFile(null);
     } catch (error) {
       console.error('Error guardando configuración:', error);
       alert('❌ Error al guardar la configuración');
@@ -232,52 +156,6 @@ export default function SettingsPage() {
               </CardHeader>
               <CardBody>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Logo Section */}
-                  <div className="border-b pb-6">
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">
-                      Logo de la Empresa
-                    </label>
-                    <div className="flex flex-col sm:flex-row items-start gap-4">
-                      <div className="relative w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
-                        {logoPreview ? (
-                          <Image
-                            src={logoPreview}
-                            alt="Logo preview"
-                            fill
-                            className="object-contain p-2"
-                            sizes="128px"
-                          />
-                        ) : (
-                          <ImageIcon size={48} className="text-gray-400" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLogoChange}
-                          className="hidden"
-                          id="logo-upload"
-                        />
-                        <label
-                          htmlFor="logo-upload"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md cursor-pointer hover:bg-primary/90 transition-colors"
-                        >
-                          <Upload size={20} />
-                          Seleccionar Logo
-                        </label>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Formato: JPG, PNG o GIF. Tamaño máximo: 2MB
-                        </p>
-                        {logoFile && (
-                          <p className="text-sm text-green-600 mt-2">
-                            ✓ Archivo seleccionado: {logoFile.name}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Business Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
@@ -370,7 +248,6 @@ export default function SettingsPage() {
                       variant="outline"
                       onClick={() => {
                         loadConfig(user.tenant_id);
-                        setLogoFile(null);
                       }}
                       disabled={loading}
                     >
@@ -400,17 +277,16 @@ export default function SettingsPage() {
               <CardBody>
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
-                    <ImageIcon size={24} className="text-blue-600" />
+                    <Building2 size={24} className="text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Información sobre el Logo</h3>
+                    <h3 className="font-semibold text-gray-900 mb-2">Información de la Empresa</h3>
                     <p className="text-sm text-gray-600">
-                      El logo y la información de tu empresa aparecerán en el sidebar y en el header del dashboard. 
+                      La información de tu empresa aparecerá en el sidebar y en los reportes del sistema. 
                       Esto ayuda a personalizar la experiencia y dar una imagen más profesional a tu negocio.
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      <strong>Nota:</strong> Asegúrate de crear el bucket &quot;tenant-assets&quot; en Supabase Storage 
-                      con acceso público antes de subir el logo.
+                      <strong>Nota:</strong> Todos los campos son opcionales excepto el nombre de la empresa.
                     </p>
                   </div>
                 </div>

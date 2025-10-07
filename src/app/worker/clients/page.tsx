@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
@@ -38,7 +38,7 @@ export default function WorkerClientsPage() {
   const [filteredRentals, setFilteredRentals] = useState<any[]>([]);
 
   // Filtrar ventas y alquileres por fecha
-  const handleDateFilterChange = (filter: string, startDate: Date, endDate: Date) => {
+  const handleDateFilterChange = useCallback((filter: string, startDate: Date, endDate: Date) => {
     setDateFilter(filter);
     
     if (filter === 'all') {
@@ -58,7 +58,7 @@ export default function WorkerClientsPage() {
       setFilteredSales(salesFiltered);
       setFilteredRentals(rentalsFiltered);
     }
-  };
+  }, [clientSales, clientRentals]);
 
   // Actualizar filtros cuando cambien los datos
   useEffect(() => {

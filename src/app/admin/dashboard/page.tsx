@@ -1,21 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { TenantConfig } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { StatCard, Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
-import { Package, TrendingUp, AlertTriangle, DollarSign, Users, Building2, Calendar, Filter, Search, MoreHorizontal, Eye, BarChart3, UserCheck, Settings } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, DollarSign, Users, Calendar, Filter, MoreHorizontal, BarChart3, UserCheck, Settings } from 'lucide-react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<{ id: number; username: string; role: string; tenant_id: number } | null>(null);
-  const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
   const [stats, setStats] = useState({
     totalTables: 0,
     availableTables: 0,
@@ -62,83 +60,22 @@ export default function AdminDashboard() {
 
     setUser(parsedUser);
     loadData(parsedUser.tenant_id);
-    loadTenantConfig(parsedUser.tenant_id);
   }, [router]);
 
-  // Recargar datos cuando cambian los filtros
-  useEffect(() => {
-    if (user) {
-      loadData(user.tenant_id);
-    }
-  }, [dateRange, viewPeriod, user]);
-
-  const handlePeriodChange = (period: 'daily' | 'weekly' | 'monthly') => {
-    setViewPeriod(period);
-    const today = new Date();
-    let startDate = new Date();
-    
-    switch (period) {
-      case 'daily':
-        startDate.setDate(today.getDate() - 1);
-        break;
-      case 'weekly':
-        startDate.setDate(today.getDate() - 7);
-        break;
-      case 'monthly':
-        startDate.setDate(today.getDate() - 30);
-        break;
-    }
-    
-    setDateRange({ startDate, endDate: today });
-  };
-
-  const formatDateRange = () => {
-    const start = dateRange.startDate.toLocaleDateString('es-PE', { 
-      month: 'short', 
-      day: 'numeric' 
-    });
-    const end = dateRange.endDate.toLocaleDateString('es-PE', { 
-      month: 'short', 
-      day: 'numeric' 
-    });
-    return `${start} - ${end}`;
-  };
-
-  const loadTenantConfig = async (tenantId: number) => {
+  const loadData = useCallback(async (tenantId: number) => {
     try {
-      const { data, error } = await supabase
-        .from('tenant_config')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .single();
+    // Cargar mesas
+    const { data: tablesData } = await supabase
+      .from('tables')
+      .select('*')
+      .eq('tenant_id', tenantId);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error cargando configuración:', error);
-        return;
-      }
-
-      if (data) {
-        setTenantConfig(data);
-      }
-    } catch (error) {
-      console.error('Error en loadTenantConfig:', error);
-    }
-  };
-
-  const loadData = async (tenantId: number) => {
-    try {
-      // Cargar mesas
-      const { data: tablesData } = await supabase
-        .from('tables')
-        .select('*')
-        .eq('tenant_id', tenantId);
-
-      // Cargar productos con stock bajo
+    // Cargar productos con stock bajo
       const { data: lowStockData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .lt('stock', 10);
+      .from('products')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .lt('stock', 10);
 
       // Cargar total de productos activos
       const { data: allProductsData } = await supabase
@@ -161,23 +98,23 @@ export default function AdminDashboard() {
         .eq('tenant_id', tenantId);
 
       // Cargar ventas totales en el período
-      const { data: salesData } = await supabase
-        .from('sales')
-        .select('total_amount')
+    const { data: salesData } = await supabase
+      .from('sales')
+      .select('total_amount')
         .eq('tenant_id', tenantId)
         .gte('created_at', dateRange.startDate.toISOString())
         .lte('created_at', dateRange.endDate.toISOString());
 
-      // Cargar ventas de hoy
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    // Cargar ventas de hoy
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
-      const { data: todaySalesData } = await supabase
-        .from('sales')
-        .select('total_amount')
-        .eq('tenant_id', tenantId)
+    const { data: todaySalesData } = await supabase
+      .from('sales')
+      .select('total_amount')
+      .eq('tenant_id', tenantId)
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString());
 
@@ -216,12 +153,12 @@ export default function AdminDashboard() {
         .sort((a, b) => b.sales - a.sales)
         .slice(0, 5);
 
-      setStats({
-        totalTables: tablesData?.length || 0,
-        availableTables: tablesData?.filter(t => t.is_available).length || 0,
-        occupiedTables: tablesData?.filter(t => !t.is_available).length || 0,
+    setStats({
+      totalTables: tablesData?.length || 0,
+      availableTables: tablesData?.filter(t => t.is_available).length || 0,
+      occupiedTables: tablesData?.filter(t => !t.is_available).length || 0,
         lowStockProducts: lowStockData?.length || 0,
-        totalSales: salesData?.reduce((sum, s) => sum + Number(s.total_amount), 0) || 0,
+      totalSales: salesData?.reduce((sum, s) => sum + Number(s.total_amount), 0) || 0,
         todaySales: todaySalesData?.reduce((sum, s) => sum + Number(s.total_amount), 0) || 0,
         totalProducts: allProductsData?.length || 0,
         activeRentals: activeRentalsData?.length || 0,
@@ -231,6 +168,45 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error cargando datos:', error);
     }
+  }, [dateRange]);
+
+  // Recargar datos cuando cambian los filtros
+  useEffect(() => {
+    if (user) {
+      loadData(user.tenant_id);
+    }
+  }, [dateRange, viewPeriod, user, loadData]);
+
+  const handlePeriodChange = (period: 'daily' | 'weekly' | 'monthly') => {
+    setViewPeriod(period);
+    const today = new Date();
+    const startDate = new Date();
+    
+    switch (period) {
+      case 'daily':
+        startDate.setDate(today.getDate() - 1);
+        break;
+      case 'weekly':
+        startDate.setDate(today.getDate() - 7);
+        break;
+      case 'monthly':
+        startDate.setDate(today.getDate() - 30);
+        break;
+    }
+    
+    setDateRange({ startDate, endDate: today });
+  };
+
+  const formatDateRange = () => {
+    const start = dateRange.startDate.toLocaleDateString('es-PE', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    const end = dateRange.endDate.toLocaleDateString('es-PE', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    return `${start} - ${end}`;
   };
 
   if (!user) {
@@ -243,10 +219,10 @@ export default function AdminDashboard() {
         <Sidebar role={user.role as 'admin' | 'worker' | 'super_admin'} username={user.username} />
         
         <div className="flex-1 overflow-auto">
-          {/* Header */}
+        {/* Header */}
           <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
             <div className="px-4 py-4 lg:px-8 lg:py-6">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <SidebarTrigger className="lg:hidden p-2 hover:bg-gray-100 rounded-lg" />
                   <div>
@@ -412,22 +388,22 @@ export default function AdminDashboard() {
                     <div>
                       <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total de Mesas</p>
                       <p className="text-3xl font-bold text-gray-900">{stats.totalTables}</p>
-                    </div>
-                  </div>
-                </div>
-                
+            </div>
+          </div>
+        </div>
+
                 <div className="p-6 bg-green-50 rounded-lg border border-green-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-green-100 rounded-lg">
                       <Image src="/icons/mesa.ico" alt="Mesa" width={32} height={32} />
-                    </div>
+              </div>
                     <div>
                       <p className="text-sm font-medium text-green-600 uppercase tracking-wide">Disponibles</p>
                       <p className="text-3xl font-bold text-green-700">{stats.availableTables}</p>
-                    </div>
-                  </div>
-                </div>
-                
+              </div>
+            </div>
+          </div>
+
                 <div className="p-6 bg-red-50 rounded-lg border border-red-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-red-100 rounded-lg">
@@ -498,9 +474,9 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500">registrados</p>
                 </div>
               </Card>
-            </div>
+          </div>
 
-            {/* Quick Actions */}
+          {/* Quick Actions */}
             <Card className="p-6 bg-white border border-gray-200 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-blue-100 rounded-lg">
@@ -580,8 +556,8 @@ export default function AdminDashboard() {
                   <span className="text-sm font-medium">Configuración</span>
                 </Button>
               </div>
-            </Card>
-          </div>
+          </Card>
+        </div>
         </div>
       </div>
     </SidebarProvider>
