@@ -8,7 +8,8 @@ import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardHeader, CardBody, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, DollarSign, ShoppingCart, Users, Package, Calendar, Download, FileText, FileSpreadsheet, Eye, BarChart3, Activity, TrendingDown, TrendingUpIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { TrendingUp, DollarSign, ShoppingCart, Users, Package, Calendar, Download, FileText, FileSpreadsheet, Eye, BarChart3, Activity, TrendingDown, TrendingUpIcon, Clock, CreditCard, Banknote, AlertTriangle, CheckCircle, Calculator } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 interface WeeklyStats {
@@ -65,6 +66,27 @@ interface SessionFinancials {
   average_sale: number;
   session_duration: string;
   total_hours: number;
+  sales_details: Array<{
+    id: number;
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    is_paid: boolean;
+    created_at: string;
+    customer_name?: string;
+  }>;
+  rentals_details: Array<{
+    id: number;
+    table_name: string;
+    start_time: string;
+    end_time: string;
+    duration_hours: number;
+    total_amount: number;
+  }>;
+  unpaid_sales_total: number;
+  paid_sales_total: number;
+  unpaid_sales_count: number;
 }
 
 interface ComprehensiveStats {
@@ -106,6 +128,8 @@ export default function StatsPage() {
   const [sessionFinancials, setSessionFinancials] = useState<SessionFinancials | null>(null);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
+  const [declaredAmount, setDeclaredAmount] = useState<string>('');
+  const [showDeclaredAmountInput, setShowDeclaredAmountInput] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -184,31 +208,93 @@ export default function StatsPage() {
       const startDate = new Date(session.start_time);
       const endDate = session.end_time ? new Date(session.end_time) : new Date();
 
-      // Cargar ventas de la sesión
-            const { data: salesData } = await supabase
-              .from('sales')
-        .select('*')
+      // Cargar ventas detalladas de la sesión con información de productos
+      const { data: salesData } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          quantity,
+          unit_price,
+          total_amount,
+          is_paid,
+          created_at,
+          products(name),
+          clients(name)
+        `)
         .eq('tenant_id', user.tenant_id)
         .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .lte('created_at', endDate.toISOString())
+        .order('created_at', { ascending: false });
 
-      // Cargar rentas de la sesión
-            const { data: rentalsData } = await supabase
-              .from('rentals')
-        .select('*')
+      // Cargar rentas detalladas de la sesión
+      const { data: rentalsData } = await supabase
+        .from('rentals')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          total_amount,
+          tables(name)
+        `)
         .eq('tenant_id', user.tenant_id)
         .gte('start_time', startDate.toISOString())
-        .lte('start_time', endDate.toISOString());
+        .lte('start_time', endDate.toISOString())
+        .not('end_time', 'is', null)
+        .order('start_time', { ascending: false });
 
-      // Calcular estadísticas
-      const totalSalesRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_amount), 0) || 0;
-      const totalRentalsRevenue = rentalsData?.reduce((sum, rental) => sum + Number(rental.total_amount), 0) || 0;
+      // Procesar detalles de ventas
+      const salesDetails = salesData?.map(sale => {
+        // Manejar tanto objeto como array para products y clients
+        const product = Array.isArray(sale.products) ? sale.products[0] : sale.products;
+        const client = Array.isArray(sale.clients) ? sale.clients[0] : sale.clients;
+        return {
+          id: sale.id,
+          product_name: product?.name || 'Producto sin nombre',
+          quantity: Number(sale.quantity),
+          unit_price: Number(sale.unit_price),
+          total_amount: Number(sale.total_amount),
+          is_paid: Boolean(sale.is_paid),
+          created_at: sale.created_at,
+          customer_name: client?.name || undefined
+        };
+      }) || [];
+
+      // Procesar detalles de rentas
+      const rentalsDetails = rentalsData?.map(rental => {
+        // Manejar tanto objeto como array para tables
+        const table = Array.isArray(rental.tables) ? rental.tables[0] : rental.tables;
+        
+        // Calcular duración manualmente
+        const startTime = new Date(rental.start_time);
+        const endTime = new Date(rental.end_time);
+        const durationMs = endTime.getTime() - startTime.getTime();
+        const durationHours = durationMs / (1000 * 60 * 60);
+        
+        return {
+          id: rental.id,
+          table_name: table?.name || 'Mesa sin nombre',
+          start_time: rental.start_time,
+          end_time: rental.end_time,
+          duration_hours: Math.round(durationHours * 10) / 10, // Redondear a 1 decimal
+          total_amount: Number(rental.total_amount)
+        };
+      }) || [];
+
+      // Calcular estadísticas financieras
+      const totalSalesRevenue = salesDetails.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const totalRentalsRevenue = rentalsDetails.reduce((sum, rental) => sum + rental.total_amount, 0);
       const totalRevenue = totalSalesRevenue + totalRentalsRevenue;
-      const productsSold = salesData?.reduce((sum, sale) => sum + Number(sale.quantity), 0) || 0;
-      const rentalsCompleted = rentalsData?.length || 0;
-      const averageSale = salesData && salesData.length > 0 ? totalSalesRevenue / salesData.length : 0;
+      const productsSold = salesDetails.reduce((sum, sale) => sum + sale.quantity, 0);
+      const rentalsCompleted = rentalsDetails.length;
+      const averageSale = salesDetails.length > 0 ? totalSalesRevenue / salesDetails.length : 0;
 
-            // Calcular duración
+      // Calcular ventas no pagadas vs pagadas
+      const unpaidSales = salesDetails.filter(sale => !sale.is_paid);
+      const paidSales = salesDetails.filter(sale => sale.is_paid);
+      const unpaidSalesTotal = unpaidSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const paidSalesTotal = paidSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+
+      // Calcular duración
       const duration = endDate.getTime() - startDate.getTime();
       const hours = Math.floor(duration / (1000 * 60 * 60));
       const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
@@ -224,14 +310,22 @@ export default function StatsPage() {
         rentals_completed: rentalsCompleted,
         average_sale: averageSale,
         session_duration: sessionDuration,
-        total_hours: totalHours
+        total_hours: totalHours,
+        sales_details: salesDetails,
+        rentals_details: rentalsDetails,
+        unpaid_sales_total: unpaidSalesTotal,
+        paid_sales_total: paidSalesTotal,
+        unpaid_sales_count: unpaidSales.length
       };
 
       setSessionFinancials(financials);
       setSelectedSession(session);
+      setDeclaredAmount(''); // Reset declared amount
+      setShowDeclaredAmountInput(false);
       setShowSessionModal(true);
     } catch (error) {
       console.error('Error cargando datos de sesión:', error);
+      alert('Error al cargar los detalles de la sesión');
     } finally {
       setLoadingSession(false);
     }
@@ -477,6 +571,43 @@ export default function StatsPage() {
   const calculatePercentageChange = (current: number, previous: number): number => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
+  };
+
+  const calculateDiscrepancy = (actualAmount: number, declaredAmount: number) => {
+    const difference = actualAmount - declaredAmount;
+    const percentage = actualAmount > 0 ? (difference / actualAmount) * 100 : 0;
+    return { difference, percentage };
+  };
+
+  const handleDeclaredAmountSubmit = () => {
+    if (!sessionFinancials || !declaredAmount) return;
+    
+    const declared = parseFloat(declaredAmount);
+    const actual = sessionFinancials.paid_sales_total + sessionFinancials.total_rentals_revenue; // Ventas pagadas + rentas
+    
+    if (isNaN(declared)) {
+      alert('Por favor ingresa un monto válido');
+      return;
+    }
+
+    const { difference, percentage } = calculateDiscrepancy(actual, declared);
+    
+    if (difference > 0) {
+      alert(`⚠️ El trabajador declaró menos de lo esperado:\n` +
+            `Monto real esperado: S/ ${actual.toFixed(2)}\n` +
+            `Monto declarado: S/ ${declared.toFixed(2)}\n` +
+            `Diferencia: S/ ${difference.toFixed(2)} (${percentage.toFixed(1)}%)\n\n` +
+            `Considera aplicar un descuento o revisar la sesión.`);
+    } else if (difference < 0) {
+      alert(`✨ El trabajador declaró más de lo esperado:\n` +
+            `Monto real esperado: S/ ${actual.toFixed(2)}\n` +
+            `Monto declarado: S/ ${declared.toFixed(2)}\n` +
+            `Diferencia: S/ ${Math.abs(difference).toFixed(2)} adicional\n\n` +
+            `¡Excelente honestidad!`);
+    } else {
+      alert(`✅ ¡Perfecto! Los montos coinciden exactamente:\n` +
+            `Monto declarado: S/ ${declared.toFixed(2)}`);
+    }
   };
 
   const handleExportToPDF = async () => {
@@ -979,9 +1110,9 @@ export default function StatsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Modal de Detalles de Sesión */}
+        {/* Modal de Detalles de Sesión Mejorado */}
         <Dialog open={showSessionModal} onOpenChange={setShowSessionModal}>
-          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-4">
+          <DialogContent className="w-[98vw] max-w-6xl max-h-[95vh] overflow-hidden mx-1 sm:mx-4">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <Calendar size={20} className="sm:w-6 sm:h-6" />
@@ -992,111 +1123,259 @@ export default function StatsPage() {
             {loadingSession ? (
               <div className="text-center py-8">
                 <Activity size={48} className="mx-auto mb-4 animate-spin text-primary" />
-                <p>Cargando datos de la sesión...</p>
-                  </div>
+                <p>Cargando datos detallados de la sesión...</p>
+              </div>
             ) : (
               sessionFinancials && selectedSession && (
-                <div className="space-y-6">
-                  {/* Información de la Sesión */}
-                  <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <h3 className="font-semibold text-blue-900 mb-2 text-sm sm:text-base">📅 Información de Sesión</h3>
-                        <div className="space-y-1 text-xs sm:text-sm text-blue-800">
-                          <p className="break-words">Nombre: <span className="font-medium">{selectedSession.session_name}</span></p>
-                          <p className="break-words">Inicio: <span className="font-medium">{new Date(selectedSession.start_time).toLocaleDateString('es-PE')} {new Date(selectedSession.start_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></p>
-                          {selectedSession.end_time && (
-                            <p className="break-words">Fin: <span className="font-medium">{new Date(selectedSession.end_time).toLocaleDateString('es-PE')} {new Date(selectedSession.end_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></p>
-                          )}
-                          <p>Estado: <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            selectedSession.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {selectedSession.is_active ? 'Activa' : 'Finalizada'}
-                          </span></p>
+                <div className="overflow-y-auto max-h-[75vh] space-y-4 pr-2">
+                  {/* Header con información básica - Más compacto */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                    {/* Información de Sesión */}
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <h3 className="font-semibold text-blue-900 mb-2 text-sm flex items-center gap-1">
+                        <Clock size={16} />
+                        Información de Sesión
+                      </h3>
+                      <div className="space-y-1 text-xs text-blue-800">
+                        <p className="truncate">📝 {selectedSession.session_name}</p>
+                        <p>🕐 {new Date(selectedSession.start_time).toLocaleDateString('es-PE')} {new Date(selectedSession.start_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</p>
+                        {selectedSession.end_time && (
+                          <p>🏁 {new Date(selectedSession.end_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</p>
+                        )}
+                        <p>⏱️ Duración: <span className="font-semibold">{sessionFinancials.session_duration}</span></p>
+                      </div>
+                    </div>
+
+                    {/* Balance del Día */}
+                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                      <h3 className="font-semibold text-green-900 mb-2 text-sm flex items-center gap-1">
+                        <Calculator size={16} />
+                        Balance del Día
+                      </h3>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-green-700">💰 Pagadas:</span>
+                          <span className="font-bold text-green-800">S/ {sessionFinancials.paid_sales_total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-blue-700">🏓 Rentas:</span>
+                          <span className="font-bold text-blue-800">S/ {sessionFinancials.total_rentals_revenue.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1">
+                          <span className="text-purple-700 font-semibold">Total:</span>
+                          <span className="font-bold text-purple-800">S/ {(sessionFinancials.paid_sales_total + sessionFinancials.total_rentals_revenue).toFixed(2)}</span>
                         </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-blue-900 mb-2 text-sm sm:text-base">⏱️ Duración</h3>
-                        <div className="text-xl sm:text-2xl font-bold text-blue-800">
-                          {sessionFinancials.session_duration}
+                    </div>
+
+                    {/* Estado de Ventas Pendientes */}
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                      <h3 className="font-semibold text-amber-900 mb-2 text-sm flex items-center gap-1">
+                        <CreditCard size={16} />
+                        Ventas Pendientes
+                      </h3>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-amber-700">🏷️ Cantidad:</span>
+                          <span className="font-bold text-amber-800">{sessionFinancials.unpaid_sales_count}</span>
                         </div>
-                        <p className="text-xs text-blue-600 mt-1">
-                          {sessionFinancials.total_hours.toFixed(2)} horas totales
-                        </p>
+                        <div className="flex justify-between">
+                          <span className="text-red-700">💳 Total No Pagado:</span>
+                          <span className="font-bold text-red-800">S/ {sessionFinancials.unpaid_sales_total.toFixed(2)}</span>
+                        </div>
+                        {sessionFinancials.unpaid_sales_count > 0 && (
+                          <div className="text-xs text-amber-600 mt-1">
+                            ⚠️ Revisar cobros pendientes
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Resumen Financiero */}
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 sm:p-6 rounded-lg border border-green-200">
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                      💰 Resumen Financiero
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
-                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Ingresos por Ventas</p>
-                        <p className="text-xl sm:text-2xl font-bold text-green-600">S/ {sessionFinancials.total_sales_revenue.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">{sessionFinancials.products_sold} productos vendidos</p>
-                      </div>
-                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
-                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Ingresos por Rentas</p>
-                        <p className="text-xl sm:text-2xl font-bold text-blue-600">S/ {sessionFinancials.total_rentals_revenue.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">{sessionFinancials.rentals_completed} mesas rentadas</p>
-                      </div>
-                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
-                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Ingresos Totales</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-purple-600">S/ {sessionFinancials.total_revenue.toFixed(2)}</p>
-                      </div>
-                      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
-                        <p className="text-xs sm:text-sm text-gray-600 font-medium">Venta Promedio</p>
-                        <p className="text-xl sm:text-2xl font-bold text-orange-600">S/ {sessionFinancials.average_sale.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">Por transacción</p>
-                      </div>
-                          </div>
-                      </div>
-
-                  {/* KPIs de la Sesión */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                    <StatCard
-                      title="Productos Vendidos"
-                      value={sessionFinancials.products_sold}
-                      subtitle="Unidades totales"
-                      icon={<Package size={24} />}
-                      accent="blue"
-                    />
-                    <StatCard
-                      title="Mesas Rentadas"
-                      value={sessionFinancials.rentals_completed}
-                      subtitle="Rentas completadas"
-                      icon={<Users size={24} />}
-                      accent="emerald"
-                    />
-                    <StatCard
-                      title="Ingreso por Hora"
-                      value={`S/ ${(sessionFinancials.total_revenue / sessionFinancials.total_hours).toFixed(2)}`}
-                      subtitle="Promedio por hora"
-                      icon={<TrendingUp size={24} />}
-                      accent="slate"
-                    />
-                      </div>
+                  {/* Resumen Financiero Compacto */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div className="bg-white p-3 rounded-lg border shadow-sm">
+                      <p className="text-xs text-gray-600 font-medium">Total Ventas</p>
+                      <p className="text-lg font-bold text-green-600">S/ {sessionFinancials.total_sales_revenue.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">{sessionFinancials.products_sold} productos</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border shadow-sm">
+                      <p className="text-xs text-gray-600 font-medium">Total Rentas</p>
+                      <p className="text-lg font-bold text-blue-600">S/ {sessionFinancials.total_rentals_revenue.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">{sessionFinancials.rentals_completed} mesas</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border shadow-sm">
+                      <p className="text-xs text-gray-600 font-medium">Total General</p>
+                      <p className="text-lg font-bold text-purple-600">S/ {sessionFinancials.total_revenue.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Todo incluido</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border shadow-sm">
+                      <p className="text-xs text-gray-600 font-medium">Promedio/Hora</p>
+                      <p className="text-lg font-bold text-orange-600">S/ {(sessionFinancials.total_revenue / sessionFinancials.total_hours).toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Rentabilidad</p>
+                    </div>
                   </div>
-              )
-          )}
 
-            <DialogFooter>
-            <Button
-              variant="outline"
+                  {/* Sección de Monto Declarado por Trabajador */}
+                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-indigo-900 flex items-center gap-2">
+                        <Banknote size={18} />
+                        Verificación de Monto Declarado
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDeclaredAmountInput(!showDeclaredAmountInput)}
+                        className="text-xs"
+                      >
+                        {showDeclaredAmountInput ? 'Ocultar' : 'Evaluar'}
+                      </Button>
+                    </div>
+                    
+                    {showDeclaredAmountInput && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-white p-3 rounded border">
+                            <p className="text-sm font-medium text-gray-700 mb-1">Monto Real Esperado:</p>
+                            <p className="text-xl font-bold text-green-700">S/ {(sessionFinancials.paid_sales_total + sessionFinancials.total_rentals_revenue).toFixed(2)}</p>
+                            <p className="text-xs text-gray-500">Ventas pagadas + rentas</p>
+                          </div>
+                          <div className="bg-white p-3 rounded border">
+                            <label htmlFor="declared-amount" className="text-sm font-medium text-gray-700 block mb-1">
+                              Monto Declarado por el Trabajador:
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="declared-amount"
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={declaredAmount}
+                                onChange={(e) => setDeclaredAmount(e.target.value)}
+                                className="text-sm"
+                              />
+                              <Button
+                                onClick={handleDeclaredAmountSubmit}
+                                size="sm"
+                                className="shrink-0"
+                                disabled={!declaredAmount}
+                              >
+                                Evaluar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-indigo-600 bg-white p-2 rounded border">
+                          💡 <strong>Nota:</strong> Se compara con ventas pagadas + rentas. Las ventas pendientes de pago no forman parte del monto a entregar.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Detalles de Productos Vendidos */}
+                  <div className="bg-white rounded-lg border shadow-sm">
+                    <div className="p-3 border-b bg-gray-50">
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <Package size={18} />
+                        Productos Vendidos ({sessionFinancials.sales_details.length})
+                      </h3>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {sessionFinancials.sales_details.length > 0 ? (
+                        <div className="space-y-1 p-2">
+                          {sessionFinancials.sales_details.map((sale, index) => (
+                            <div key={sale.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm hover:bg-gray-100">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                  {index + 1}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium truncate">{sale.product_name}</p>
+                                  <div className="flex items-center gap-4 text-xs text-gray-600">
+                                    <span>🔢 Cant: {sale.quantity}</span>
+                                    <span>💰 Unit: S/ {sale.unit_price.toFixed(2)}</span>
+                                    <span>🕐 {new Date(sale.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    {!sale.is_paid && <span className="text-red-600 font-medium">💳 PENDIENTE</span>}
+                                    {sale.customer_name && <span className="text-blue-600">👤 {sale.customer_name}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right ml-2">
+                                <div className={`font-bold ${!sale.is_paid ? 'text-red-600' : 'text-green-600'}`}>
+                                  S/ {sale.total_amount.toFixed(2)}
+                                </div>
+                                {!sale.is_paid && (
+                                  <div className="text-xs text-red-500">Pendiente</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Package size={32} className="mx-auto mb-2 opacity-30" />
+                          <p className="text-sm">No se vendieron productos en esta sesión</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Detalles de Mesas Rentadas */}
+                  {sessionFinancials.rentals_details.length > 0 && (
+                    <div className="bg-white rounded-lg border shadow-sm">
+                      <div className="p-3 border-b bg-gray-50">
+                        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                          <Users size={18} />
+                          Mesas Rentadas ({sessionFinancials.rentals_details.length})
+                        </h3>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        <div className="space-y-1 p-2">
+                          {sessionFinancials.rentals_details.map((rental, index) => (
+                            <div key={rental.id} className="flex items-center justify-between p-2 bg-blue-50 rounded text-sm">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                  {index + 1}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium">{rental.table_name}</p>
+                                  <div className="flex items-center gap-4 text-xs text-gray-600">
+                                    <span>🕐 Inicio: {new Date(rental.start_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>🏁 Fin: {new Date(rental.end_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>⏱️ {rental.duration_hours.toFixed(1)}h</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right ml-2">
+                                <div className="font-bold text-blue-600">S/ {rental.total_amount.toFixed(2)}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
+            <DialogFooter className="flex-shrink-0 pt-4 border-t">
+              <Button
+                variant="outline"
                 onClick={() => {
                   setShowSessionModal(false);
                   setSelectedSession(null);
                   setSessionFinancials(null);
+                  setDeclaredAmount('');
+                  setShowDeclaredAmountInput(false);
                 }}
-            >
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              >
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
       </div>
     </SidebarProvider>
