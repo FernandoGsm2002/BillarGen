@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardBody, StatCard } from '@/components/ui/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
+// Removido: Table components no se usan más tras cambio a cards
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/Badge';
@@ -74,7 +74,7 @@ export default function ClientsPage() {
       // Re-aplicar filtro actual
       handleDateFilterChange(dateFilter, new Date(), new Date());
     }
-  }, [clientSales, clientRentals]);
+  }, [clientSales, clientRentals, dateFilter, handleDateFilterChange]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -343,139 +343,110 @@ export default function ClientsPage() {
             </Button>
           </div>
 
-          {/* Tabla de Clientes */}
+          {/* Cards de Clientes - Diseño Responsivo */}
           <Card>
             <CardBody className="p-0">
-              {/* Vista móvil - Cards */}
-              <div className="md:hidden">
-                {filteredClients.length > 0 ? (
-                  <div className="divide-y divide-gray-200">
-                    {filteredClients.map((client) => (
-                      <div key={client.id} className="p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                              <UserCheck size={20} className="text-indigo-600" />
+              {filteredClients.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+                  {filteredClients.map((client) => (
+                    <div key={client.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                      {/* Header del cliente */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
+                            <UserCheck size={24} className="text-indigo-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-gray-900 truncate">{client.name}</h3>
+                            <p className="text-sm text-gray-500 truncate">
+                              {client.phone || client.email || 'Sin contacto'}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={client.total_debt > 0 ? 'danger' : 'success'} className="shrink-0 ml-2">
+                          {client.total_debt > 0 ? 'Con Deuda' : 'Al Día'}
+                        </Badge>
+                      </div>
+
+                      {/* Información financiera */}
+                      <div className="space-y-3 mb-4">
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <span className="text-xs text-gray-600 font-medium">Total Compras</span>
+                              <p className="font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</p>
                             </div>
                             <div>
-                              <div className="text-sm font-bold text-gray-900">{client.name}</div>
-                              <div className="text-xs text-gray-500">{client.phone || client.email || 'Sin contacto'}</div>
+                              <span className="text-xs text-gray-600 font-medium">Deuda Pendiente</span>
+                              <p className="font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</p>
                             </div>
                           </div>
-                          <Badge variant={client.total_debt > 0 ? 'danger' : 'success'}>
-                            {client.total_debt > 0 ? 'Con Deuda' : 'Al Día'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <span className="text-gray-600">Total Compras:</span>
-                            <p className="font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Deuda:</span>
-                            <p className="font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</p>
-                            {client.unpaid_sales > 0 && (
-                              <p className="text-xs text-gray-500">{client.unpaid_sales} sin pagar</p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-2 pt-2">
-                          <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)} className="flex-1">
-                            <Eye size={16} className="mr-1" /> Ver Detalle
-                          </Button>
-                          {client.total_debt > 0 && (
-                            <Button size="sm" onClick={() => handlePayDebt(client.id)} className="flex-1">
-                              Pagar Deuda
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
-                    <p className="text-gray-600">
-                      {filter === 'with_debt' 
-                        ? 'No hay clientes con deudas pendientes'
-                        : 'Los clientes aparecerán cuando realicen compras'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Vista desktop - Tabla */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Contacto</TableHead>
-                      <TableHead>Total Compras</TableHead>
-                      <TableHead>Deuda Pendiente</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredClients.map((client) => (
-                      <TableRow key={client.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                              <UserCheck size={20} className="text-indigo-600" />
-                            </div>
-                            <div className="text-sm font-bold text-gray-900">{client.name}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm text-gray-900">{client.phone || '-'}</div>
-                          <div className="text-xs text-gray-500">{client.email || '-'}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-lg font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</div>
                           {client.unpaid_sales > 0 && (
-                            <div className="text-xs text-gray-500">{client.unpaid_sales} Ventas sin pagar</div>
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <p className="text-xs text-amber-600 font-medium">
+                                {client.unpaid_sales} venta{client.unpaid_sales !== 1 ? 's' : ''} sin pagar
+                              </p>
+                            </div>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={client.total_debt > 0 ? 'danger' : 'success'}>
-                            {client.total_debt > 0 ? 'Con Deuda' : 'Al Día'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)}>
-                              <Eye size={16} className="mr-1" /> Ver
-                            </Button>
-                            {client.total_debt > 0 && (
-                              <Button size="sm" onClick={() => handlePayDebt(client.id)}>Pagar</Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
 
-                {filteredClients.length === 0 && (
-                  <div className="text-center py-12">
-                    <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
-                    <p className="text-gray-600">
-                      {filter === 'with_debt' 
-                        ? 'No hay clientes con deudas pendientes'
-                        : 'Los clientes aparecerán cuando realicen compras'}
-                    </p>
-                  </div>
-                )}
-              </div>
+                        {/* Información de contacto adicional */}
+                        {(client.phone && client.email) && (
+                          <div className="text-xs text-gray-500 space-y-1">
+                            <div className="flex items-center gap-1">
+                              <span>📞</span>
+                              <span>{client.phone}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span>✉️</span>
+                              <span className="truncate">{client.email}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="space-y-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleViewDetails(client)} 
+                          className="w-full"
+                        >
+                          <Eye size={16} className="mr-2" /> Ver Historial Completo
+                        </Button>
+                        {client.total_debt > 0 && (
+                          <Button 
+                            size="sm" 
+                            onClick={() => handlePayDebt(client.id)} 
+                            className="w-full bg-green-600 hover:bg-green-700"
+                          >
+                            💰 Marcar Deuda como Pagada
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <UserCheck size={64} className="mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
+                  <p className="text-gray-600 mb-6">
+                    {filter === 'with_debt' 
+                      ? 'No hay clientes con deudas pendientes en este momento'
+                      : 'Los clientes aparecerán aquí cuando realicen sus primeras compras'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Plus size={20} />
+                    Crear Primer Cliente
+                  </Button>
+                </div>
+              )}
             </CardBody>
           </Card>
         </div>

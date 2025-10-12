@@ -7,10 +7,10 @@ import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { StatCard, Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DateFilters } from '@/components/DateFilters';
 import { Input } from '@/components/ui/input';
-import { Users, AlertTriangle, DollarSign, Eye, Package, Calendar, CreditCard } from 'lucide-react';
+import { Users, AlertTriangle, DollarSign, Eye, Package, Calendar, Search } from 'lucide-react';
 
 interface ClientWithDebt {
   id: number;
@@ -27,9 +27,9 @@ export default function WorkerClientsPage() {
   const [user, setUser] = useState<{ id: number; username: string; role: string; tenant_id: number } | null>(null);
   const [clients, setClients] = useState<ClientWithDebt[]>([]);
   const [filter, setFilter] = useState<'all' | 'with_debt'>('all');
-  const [showModal, setShowModal] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Removido: variables no usadas en worker clients
   const [selectedClient, setSelectedClient] = useState<ClientWithDebt | null>(null);
   const [clientSales, setClientSales] = useState<any[]>([]);
   const [clientRentals, setClientRentals] = useState<Array<{ id: number; total_amount: number; is_paid: boolean; end_time: string; tables?: { name: string } }>>([]);
@@ -69,7 +69,7 @@ export default function WorkerClientsPage() {
       // Re-aplicar filtro actual
       handleDateFilterChange(dateFilter, new Date(), new Date());
     }
-  }, [clientSales, clientRentals]);
+  }, [clientSales, clientRentals, dateFilter, handleDateFilterChange]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -87,6 +87,12 @@ export default function WorkerClientsPage() {
     setUser(parsedUser);
     loadClients(parsedUser.tenant_id);
   }, [router]);
+
+  // Debounce del buscador
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 600);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   const loadClients = async (tenantId: number) => {
     const { data: clientsData } = await supabase
@@ -125,29 +131,7 @@ export default function WorkerClientsPage() {
     setClients(clientsWithDebt);
   };
 
-  const handleCreateClient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    if (!form.name.trim()) return;
-    try {
-      setCreating(true);
-      await supabase
-        .from('clients')
-        .insert([{
-          tenant_id: user.tenant_id,
-          name: form.name.trim(),
-          phone: form.phone.trim() || null
-        }]);
-      setForm({ name: '', phone: '' });
-      setShowModal(false);
-      loadClients(user.tenant_id);
-    } catch (err) {
-      console.error(err);
-      alert('Error al crear cliente');
-    } finally {
-      setCreating(false);
-    }
-  };
+  // Removido: handleCreateClient no usado en worker (solo ver clientes)
 
   const handleViewDetails = async (client: ClientWithDebt) => {
     setSelectedClient(client);
@@ -208,9 +192,15 @@ export default function WorkerClientsPage() {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
-  const filteredClients = filter === 'with_debt' 
+  const baseClients = filter === 'with_debt' 
     ? clients.filter(c => c.total_debt > 0)
     : clients;
+  const filteredClients = debouncedSearch
+    ? baseClients.filter(c =>
+        c.name.toLowerCase().includes(debouncedSearch) ||
+        (c.phone ? c.phone.toLowerCase().includes(debouncedSearch) : false)
+      )
+    : baseClients;
 
   const totalDebt = clients.reduce((sum, c) => sum + c.total_debt, 0);
   const clientsWithDebt = clients.filter(c => c.total_debt > 0).length;
@@ -245,87 +235,133 @@ export default function WorkerClientsPage() {
               <StatCard title="Deuda Total" value={`S/ ${totalDebt.toFixed(2)}`} accent="red" icon={<DollarSign size={40} />} />
             </div>
 
+            {/* Filtros y Buscador */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+              {/* Filtros por tipo */}
+              <div className="flex gap-3">
+                <Button
+                  variant={filter === 'all' ? 'default' : 'outline'}
+                  onClick={() => setFilter('all')}
+                  size="sm"
+                >
+                  Todos los Clientes
+                </Button>
+                <Button
+                  variant={filter === 'with_debt' ? 'default' : 'outline'}
+                  onClick={() => setFilter('with_debt')}
+                  size="sm"
+                >
+                  Solo con Deudas
+                </Button>
+              </div>
+
+              {/* Buscador */}
+              <div className="relative max-w-md w-full sm:w-auto">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar por nombre o teléfono..."
+                  className="pl-10 pr-10"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
             <Card>
               <CardBody className="p-0">
-                {/* Vista móvil - Cards */}
-                <div className="md:hidden">
-                  {filteredClients.length > 0 ? (
-                    <div className="divide-y divide-gray-200">
-                      {filteredClients.map((client) => (
-                        <div key={client.id} className="p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <Users size={20} className="text-indigo-600" />
-                              </div>
-                              <div>
-                                <div className="text-sm font-bold text-gray-900">{client.name}</div>
-                                <div className="text-xs text-gray-500">{client.phone || 'Sin teléfono'}</div>
-                              </div>
+                {filteredClients.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+                    {filteredClients.map((client) => (
+                      <div key={client.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                        {/* Header del cliente */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
+                              <Users size={24} className="text-indigo-600" />
                             </div>
-                            <div className="text-right">
-                              <div className="text-sm font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</div>
-                              <div className="text-xs text-gray-500">Deuda</div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-bold text-gray-900 truncate">{client.name}</h3>
+                              <p className="text-sm text-gray-500 truncate">
+                                {client.phone || 'Sin teléfono'}
+                              </p>
                             </div>
                           </div>
-                          
-                          <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)} className="w-full">
-                            <Eye size={16} className="mr-1" /> Ver Historial
+                          <div className="shrink-0 ml-2 text-right">
+                            <div className="text-lg font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">Deuda</div>
+                          </div>
+                        </div>
+
+                        {/* Información financiera */}
+                        <div className="space-y-3 mb-4">
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <span className="text-xs text-gray-600 font-medium">Total Compras</span>
+                                <p className="font-bold text-gray-900">S/ {client.total_purchases.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <span className="text-xs text-gray-600 font-medium">Ventas Pendientes</span>
+                                <p className="font-bold text-amber-600">{client.unpaid_sales}</p>
+                              </div>
+                            </div>
+                            {client.unpaid_sales > 0 && (
+                              <div className="mt-2 pt-2 border-t border-gray-200">
+                                <p className="text-xs text-amber-600 font-medium">
+                                  {client.unpaid_sales} venta{client.unpaid_sales !== 1 ? 's' : ''} sin pagar
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Estado del cliente */}
+                          <div className="flex items-center justify-center">
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              client.total_debt > 0 
+                                ? 'bg-red-100 text-red-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {client.total_debt > 0 ? '⚠️ Cliente con Deuda' : '✅ Cliente al Día'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Acciones */}
+                        <div className="space-y-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleViewDetails(client)} 
+                            className="w-full"
+                          >
+                            <Eye size={16} className="mr-2" /> Ver Historial Completo
                           </Button>
                         </div>
-                      ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <Users size={64} className="mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">No hay clientes registrados</h3>
+                    <p className="text-gray-600 mb-6">
+                      Los clientes aparecerán aquí cuando realicen sus primeras compras o se registren en el sistema
+                    </p>
+                    <div className="text-sm text-gray-500">
+                      💡 Los clientes se crean automáticamente al hacer ventas fiadas
                     </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Users size={48} className="mx-auto text-gray-400 mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
-                      <p className="text-gray-600">Los clientes aparecerán cuando realicen compras</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Vista desktop - Tabla */}
-                <div className="hidden md:block">
-                  <table className="min-w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Cliente</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Contacto</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Deuda</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredClients.map((client) => (
-                        <tr key={client.id} className="border-b hover:bg-slate-50">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <Users size={16} className="text-indigo-600" />
-                              </div>
-                              <span className="font-medium">{client.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm">{client.phone || '-'}</td>
-                          <td className="px-4 py-3 font-bold text-red-600">S/ {client.total_debt.toFixed(2)}</td>
-                          <td className="px-4 py-3">
-                            <Button size="sm" variant="outline" onClick={() => handleViewDetails(client)}>
-                              <Eye size={16} className="mr-1" /> Ver
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  
-                  {filteredClients.length === 0 && (
-                    <div className="text-center py-12">
-                      <Users size={48} className="mx-auto text-gray-400 mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay clientes</h3>
-                      <p className="text-gray-600">Los clientes aparecerán cuando realicen compras</p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </CardBody>
             </Card>
           </div>

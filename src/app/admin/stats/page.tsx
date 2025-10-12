@@ -9,7 +9,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardHeader, CardBody, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TrendingUp, DollarSign, ShoppingCart, Users, Package, Calendar, Download, FileText, FileSpreadsheet, Eye, BarChart3, Activity, TrendingDown, TrendingUpIcon, Clock, CreditCard, Banknote, AlertTriangle, CheckCircle, Calculator } from 'lucide-react';
+import { DollarSign, ShoppingCart, Users, Package, Calendar, Download, FileText, FileSpreadsheet, Eye, BarChart3, Activity, TrendingDown, TrendingUpIcon, Clock, CreditCard, Banknote, Calculator } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 interface WeeklyStats {
@@ -130,6 +130,7 @@ export default function StatsPage() {
   const [loadingSession, setLoadingSession] = useState(false);
   const [declaredAmount, setDeclaredAmount] = useState<string>('');
   const [showDeclaredAmountInput, setShowDeclaredAmountInput] = useState(false);
+  const [generatingSessionPDF, setGeneratingSessionPDF] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -579,6 +580,25 @@ export default function StatsPage() {
     return { difference, percentage };
   };
 
+  const generateSessionPDF = async (session: DailySession, financials: SessionFinancials) => {
+    if (!tenantConfig) {
+      alert('No se pudo cargar la configuración de la empresa');
+      return;
+    }
+
+    setGeneratingSessionPDF(true);
+    try {
+      const { generateSessionPDF } = await import('@/lib/sessionPdfUtils');
+      await generateSessionPDF(session, financials, tenantConfig);
+      alert('Reporte de sesión descargado exitosamente');
+    } catch (error) {
+      console.error('Error generando PDF de sesión:', error);
+      alert('Error al generar el reporte PDF de la sesión');
+    } finally {
+      setGeneratingSessionPDF(false);
+    }
+  };
+
   const handleDeclaredAmountSubmit = () => {
     if (!sessionFinancials || !declaredAmount) return;
     
@@ -593,19 +613,19 @@ export default function StatsPage() {
     const { difference, percentage } = calculateDiscrepancy(actual, declared);
     
     if (difference > 0) {
-      alert(`⚠️ El trabajador declaró menos de lo esperado:\n` +
+      alert(`El trabajador declaró menos de lo esperado:\n` +
             `Monto real esperado: S/ ${actual.toFixed(2)}\n` +
             `Monto declarado: S/ ${declared.toFixed(2)}\n` +
             `Diferencia: S/ ${difference.toFixed(2)} (${percentage.toFixed(1)}%)\n\n` +
             `Considera aplicar un descuento o revisar la sesión.`);
     } else if (difference < 0) {
-      alert(`✨ El trabajador declaró más de lo esperado:\n` +
+      alert(`El trabajador declaró más de lo esperado:\n` +
             `Monto real esperado: S/ ${actual.toFixed(2)}\n` +
             `Monto declarado: S/ ${declared.toFixed(2)}\n` +
             `Diferencia: S/ ${Math.abs(difference).toFixed(2)} adicional\n\n` +
             `¡Excelente honestidad!`);
     } else {
-      alert(`✅ ¡Perfecto! Los montos coinciden exactamente:\n` +
+      alert(`¡Perfecto! Los montos coinciden exactamente:\n` +
             `Monto declarado: S/ ${declared.toFixed(2)}`);
     }
   };
@@ -1019,12 +1039,33 @@ export default function StatsPage() {
                               size="sm"
                               onClick={() => loadSessionFinancials(session)}
                               disabled={loadingSession}
-                              className="flex items-center gap-2 text-xs sm:text-sm w-full sm:w-auto"
+                              className="flex items-center gap-2 text-xs sm:text-sm"
                             >
                               <Eye size={14} className="sm:w-4 sm:h-4" />
                               <span className="hidden sm:inline">Ver Detalles</span>
-                              <span className="sm:hidden">Detalles</span>
+                              <span className="sm:hidden">Ver</span>
                             </Button>
+                            {!session.is_active && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={async () => {
+                                  // Cargar datos de la sesión para el PDF
+                                  await loadSessionFinancials(session);
+                                  // Esperar un momento para que se carguen los datos
+                                  setTimeout(() => {
+                                    if (sessionFinancials) {
+                                      generateSessionPDF(session, sessionFinancials);
+                                    }
+                                  }, 1000);
+                                }}
+                                disabled={generatingSessionPDF}
+                                className="flex items-center gap-2 text-xs sm:text-sm bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                <Download size={14} className="sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">PDF</span>
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1361,18 +1402,32 @@ export default function StatsPage() {
             )}
 
             <DialogFooter className="flex-shrink-0 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSessionModal(false);
-                  setSelectedSession(null);
-                  setSessionFinancials(null);
-                  setDeclaredAmount('');
-                  setShowDeclaredAmountInput(false);
-                }}
-              >
-                Cerrar
-              </Button>
+              <div className="flex gap-2 w-full">
+                {selectedSession && sessionFinancials && !selectedSession.is_active && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => generateSessionPDF(selectedSession, sessionFinancials)}
+                    disabled={generatingSessionPDF}
+                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <Download size={16} />
+                    {generatingSessionPDF ? 'Generando PDF...' : 'Descargar Reporte PDF'}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSessionModal(false);
+                    setSelectedSession(null);
+                    setSessionFinancials(null);
+                    setDeclaredAmount('');
+                    setShowDeclaredAmountInput(false);
+                  }}
+                  className="flex-1"
+                >
+                  Cerrar
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

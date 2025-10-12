@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { TenantConfig } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card } from '@/components/ui/Card';
@@ -14,6 +15,7 @@ import { Badge } from '@/components/ui/Badge';
 export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<{ id: number; username: string; role: string; tenant_id: number } | null>(null);
+  const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
   const [stats, setStats] = useState({
     totalTables: 0,
     availableTables: 0,
@@ -60,7 +62,29 @@ export default function AdminDashboard() {
 
     setUser(parsedUser);
     loadData(parsedUser.tenant_id);
+    loadTenantConfig(parsedUser.tenant_id);
   }, [router]);
+
+  const loadTenantConfig = async (tenantId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('tenant_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error cargando configuración:', error);
+        return;
+      }
+
+      if (data) {
+        setTenantConfig(data);
+      }
+    } catch (error) {
+      console.error('Error en loadTenantConfig:', error);
+    }
+  };
 
   const loadData = useCallback(async (tenantId: number) => {
     try {
@@ -226,7 +250,12 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-4">
                   <SidebarTrigger className="lg:hidden p-2 hover:bg-gray-100 rounded-lg" />
                   <div>
-                    <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Dashboard</h1>
+                    <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                      {tenantConfig?.business_name 
+                        ? `Bienvenido a ${tenantConfig.business_name} Billar`
+                        : 'Bienvenido a tu Billar'
+                      }
+                    </h1>
                     <p className="text-sm text-gray-600 mt-1">Resumen general de tu negocio</p>
                   </div>
                 </div>

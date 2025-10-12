@@ -18,7 +18,7 @@ import {
   Settings,
   Building2
 } from 'lucide-react';
-import { Sidebar as UiSidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarProvider } from '@/components/ui/sidebar';
+import { Sidebar as UiSidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 
 interface SidebarProps {
   role: 'admin' | 'worker' | 'super_admin';
@@ -29,14 +29,13 @@ export default function Sidebar({ role, username }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
-  const [tenantId, setTenantId] = useState<number | null>(null);
+  // Removido: tenantId no usado directamente
 
   useEffect(() => {
     // Load tenant config
     const userData = localStorage.getItem('user');
     if (userData) {
       const parsedUser = JSON.parse(userData);
-      setTenantId(parsedUser.tenant_id);
       loadTenantConfig(parsedUser.tenant_id);
     }
   }, []);
@@ -83,6 +82,7 @@ export default function Sidebar({ role, username }: SidebarProps) {
     { href: '/worker/tables', icon: Grid3x3, label: 'Mesas' },
     { href: '/worker/pos', icon: ShoppingCart, label: 'Punto de Venta' },
     { href: '/worker/clients', icon: UserCheck, label: 'Clientes' },
+    { href: '/worker/earnings', icon: TrendingUp, label: 'Ingresos Hoy' },
   ];
 
   const superAdminLinks = [
@@ -95,7 +95,6 @@ export default function Sidebar({ role, username }: SidebarProps) {
 
   // Usar configuración del tenant o valores por defecto
   const businessName = tenantConfig?.business_name || 'BillarExpert';
-  const businessType = 'Billar';
   const logoUrl = '/pngs/logologin.png'; // Siempre usar logo por defecto
 
   return (

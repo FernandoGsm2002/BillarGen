@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { TenantConfig } from '@/types/database.types';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { StatCard } from '@/components/ui/Card';
@@ -13,6 +14,7 @@ import Image from 'next/image';
 export default function WorkerDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<{ id: number; username: string; role: string; tenant_id: number } | null>(null);
+  const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
   const [stats, setStats] = useState({
     totalTables: 0,
     occupiedTables: 0,
@@ -35,7 +37,29 @@ export default function WorkerDashboard() {
 
     setUser(parsedUser);
     loadData(parsedUser.tenant_id, parsedUser.id);
+    loadTenantConfig(parsedUser.tenant_id);
   }, [router]);
+
+  const loadTenantConfig = async (tenantId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('tenant_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error cargando configuración:', error);
+        return;
+      }
+
+      if (data) {
+        setTenantConfig(data);
+      }
+    } catch (error) {
+      console.error('Error en loadTenantConfig:', error);
+    }
+  };
 
   const loadData = async (tenantId: number, userId: number) => {
 
@@ -108,8 +132,13 @@ export default function WorkerDashboard() {
                 <TrendingUp size={32} />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Panel de Empleado</h1>
-                <p className="text-base text-muted-foreground mt-1">Resumen de actividad</p>
+                <h1 className="text-3xl font-bold">
+                  {tenantConfig?.business_name 
+                    ? `Bienvenido a ${tenantConfig.business_name} Billar`
+                    : 'Bienvenido a tu Billar'
+                  }
+                </h1>
+                <p className="text-base text-muted-foreground mt-1">Panel de empleado - Resumen de actividad</p>
               </div>
             </div>
           </div>

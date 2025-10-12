@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
-import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X, BarChart3, Calendar, History, TrendingUp as TrendingUpIcon } from 'lucide-react';
+import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X, BarChart3, Calendar, History } from 'lucide-react';
 import Image from 'next/image';
 
 const AVAILABLE_IMAGES = [
@@ -79,6 +79,22 @@ export default function ProductsPage() {
     start_time: string;
     is_active: boolean;
   } | null>(null);
+  const [showStockVerificationModal, setShowStockVerificationModal] = useState(false);
+  const [stockVerificationData, setStockVerificationData] = useState<Array<{
+    product: Product;
+    total_changes: number;
+    last_change: string;
+    recent_changes: Array<{
+      id: number;
+      change_type: string;
+      quantity_change: number;
+      stock_before: number;
+      stock_after: number;
+      reason: string | null;
+      created_at: string;
+      users?: { username: string } | null;
+    }>;
+  }>>([]);
   const [formData, setFormData] = useState({ 
     name: '', 
     price: '', 
@@ -535,6 +551,54 @@ export default function ProductsPage() {
     }
   };
 
+  const verifyStockHistory = async () => {
+    if (!user) return;
+
+    try {
+      // Obtener todos los cambios de stock de los últimos 30 días
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Procesar cada producto para obtener su historial
+      const stockVerification = await Promise.all(
+        products.map(async (product) => {
+          // Obtener todos los cambios de stock para este producto
+          const { data: stockChanges } = await supabase
+            .from('stock_changes')
+            .select(`
+              *,
+              users:user_id (username)
+            `)
+            .eq('tenant_id', user.tenant_id)
+            .eq('product_id', product.id)
+            .gte('created_at', thirtyDaysAgo.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(10); // Últimos 10 cambios por producto
+
+          const totalChanges = stockChanges?.length || 0;
+          const lastChange = stockChanges?.[0]?.created_at || 'Nunca';
+          
+          return {
+            product,
+            total_changes: totalChanges,
+            last_change: lastChange,
+            recent_changes: stockChanges || []
+          };
+        })
+      );
+
+      // Ordenar por productos con más cambios recientes
+      stockVerification.sort((a, b) => b.total_changes - a.total_changes);
+
+      setStockVerificationData(stockVerification);
+      setShowStockVerificationModal(true);
+      
+    } catch (error) {
+      console.error('Error verificando stock:', error);
+      alert('Error al verificar el historial de stock');
+    }
+  };
+
   const calculateSessionFinancials = async (sessionEndTime: string) => {
     if (!user || !currentSession) return;
 
@@ -711,6 +775,14 @@ export default function ProductsPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={verifyStockHistory}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <History size={20} className="mr-2" /> Verificar Stock
+              </Button>
               {!currentSession ? (
                 <Button
                   variant="default"
@@ -1336,6 +1408,224 @@ export default function ProductsPage() {
                 setSelectedProductForHistory(null);
                 setStockHistory([]);
               }}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Verificación de Stock */}
+      <Dialog open={showStockVerificationModal} onOpenChange={setShowStockVerificationModal}>
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden flex flex-col mx-2 sm:mx-4">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <History size={24} />
+              Verificación de Stock - Últimos 30 días
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+            <div className="text-sm text-muted-foreground">
+              Este reporte muestra todos los cambios de stock registrados en los últimos 30 días, 
+              sin necesidad de tener una sesión activa.
+            </div>
+
+            {stockVerificationData.length > 0 ? (
+              <div className="space-y-4">
+                {stockVerificationData.map((item) => (
+                  <div key={item.product.id} className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                    {/* Header del producto - Mejorado y más compacto */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-white border-2 border-white shadow-sm">
+                            {item.product.image_url ? (
+                              <Image
+                                src={item.product.image_url}
+                                alt={item.product.name}
+                                fill
+                                className="object-cover"
+                                sizes="64px"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full">
+                                <PackageIcon size={28} className="text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-bold text-gray-900 truncate">{item.product.name}</h3>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Stock: {item.product.stock}
+                              </span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {item.total_changes} cambios
+                              </span>
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                S/ {item.product.price.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Última actualización */}
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500 font-medium">Último cambio:</div>
+                          <div className="text-xs text-gray-700 font-semibold">
+                            {item.last_change !== 'Nunca' 
+                              ? new Date(item.last_change).toLocaleDateString('es-PE', { 
+                                  day: '2-digit', 
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              : 'Sin cambios'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cambios recientes - Optimizado para legibilidad */}
+                    <div className="divide-y divide-gray-100">
+                      {item.recent_changes.length > 0 ? (
+                        <div className="max-h-60 overflow-y-auto">
+                          {item.recent_changes.slice(0, 5).map((change, index) => {
+                            const changeTypeLabels: Record<string, { label: string; bgColor: string; textColor: string; icon: string }> = {
+                              'increase': { label: 'Aumento', bgColor: 'bg-green-50', textColor: 'text-green-700', icon: '⬆️' },
+                              'decrease': { label: 'Disminución', bgColor: 'bg-red-50', textColor: 'text-red-700', icon: '⬇️' },
+                              'adjustment': { label: 'Ajuste', bgColor: 'bg-yellow-50', textColor: 'text-yellow-700', icon: '⚖️' },
+                              'sale': { label: 'Venta', bgColor: 'bg-blue-50', textColor: 'text-blue-700', icon: '🛒' },
+                              'initial': { label: 'Inicial', bgColor: 'bg-purple-50', textColor: 'text-purple-700', icon: '🎯' }
+                            };
+                            const typeInfo = changeTypeLabels[change.change_type] || { 
+                              label: change.change_type, 
+                              bgColor: 'bg-gray-50', 
+                              textColor: 'text-gray-700',
+                              icon: '📦'
+                            };
+                            
+                            return (
+                              <div key={change.id} className={`p-4 hover:bg-gray-50 transition-colors ${index === 0 ? typeInfo.bgColor : ''}`}>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <div className="text-lg">{typeInfo.icon}</div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className={`text-sm font-semibold ${typeInfo.textColor}`}>
+                                          {typeInfo.label}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                          {new Date(change.created_at).toLocaleDateString('es-PE', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-sm">
+                                        <span className="text-gray-600">
+                                          Stock: {change.stock_before} → {change.stock_after}
+                                        </span>
+                                        <span className={`font-bold px-2 py-1 rounded text-xs ${
+                                          change.quantity_change > 0 ? 'bg-green-100 text-green-700' : 
+                                          change.quantity_change < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                                        }`}>
+                                          {change.quantity_change > 0 ? '+' : ''}{change.quantity_change}
+                                        </span>
+                                      </div>
+                                      {change.reason && (
+                                        <div className="text-xs text-gray-600 mt-1 italic">
+                                          &quot;{change.reason}&quot;
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-gray-500 font-medium">
+                                    {change.users?.username || 'Sistema'}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {item.recent_changes.length > 5 && (
+                            <div className="p-3 text-center bg-gray-50 border-t">
+                              <span className="text-xs text-gray-500">
+                                y {item.recent_changes.length - 5} cambios más...
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center text-gray-500">
+                          <PackageIcon size={48} className="mx-auto mb-3 opacity-30" />
+                          <p className="text-sm font-medium">Sin cambios recientes</p>
+                          <p className="text-xs">No hay movimientos en los últimos 30 días</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer con acciones */}
+                    <div className="bg-gray-50 px-4 py-3 border-t flex flex-col sm:flex-row gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadStockHistory(item.product)}
+                        className="flex-1 text-xs font-medium"
+                      >
+                        <History size={14} className="mr-1" />
+                        Ver Historial Completo ({item.total_changes} cambios)
+                      </Button>
+                      {item.total_changes === 0 && (
+                        <div className="text-center text-xs text-gray-500 py-1">
+                          Producto sin movimientos de stock
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <History size={64} className="mx-auto text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay cambios de stock</h3>
+                <p className="text-gray-600">No se han registrado cambios en el stock en los últimos 30 días.</p>
+              </div>
+            )}
+
+            {/* Resumen general */}
+            {stockVerificationData.length > 0 && (
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Resumen de Verificación:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Total productos analizados: </span>
+                    <span className="font-semibold">{stockVerificationData.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Productos con cambios: </span>
+                    <span className="font-semibold text-blue-600">
+                      {stockVerificationData.filter(item => item.total_changes > 0).length}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total cambios registrados: </span>
+                    <span className="font-semibold text-green-600">
+                      {stockVerificationData.reduce((sum, item) => sum + item.total_changes, 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowStockVerificationModal(false)}
             >
               Cerrar
             </Button>
