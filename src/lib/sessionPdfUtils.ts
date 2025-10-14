@@ -155,8 +155,7 @@ export const generateSessionPDF = async (
         ['Ingresos por Alquiler de Mesas', `${financials.rentals_completed} mesas`, `S/ ${financials.total_rentals_revenue.toFixed(2)}`, `Promedio: S/ ${(financials.total_rentals_revenue / Math.max(financials.rentals_completed, 1)).toFixed(2)} por mesa`],
         ['TOTAL DE INGRESOS', '-', `S/ ${financials.total_revenue.toFixed(2)}`, 'Suma total de la sesión'],
         ['Ventas Pagadas', `${financials.sales_details.filter(s => s.is_paid).length} ventas`, `S/ ${financials.paid_sales_total.toFixed(2)}`, 'Efectivo recibido'],
-        ['Ventas Pendientes (Fiadas)', `${financials.unpaid_sales_count} ventas`, `S/ ${financials.unpaid_sales_total.toFixed(2)}`, 'Por cobrar'],
-        ['Ingresos por Hora', '-', `S/ ${(financials.total_revenue / financials.total_hours).toFixed(2)}`, 'Productividad de la sesión']
+        ['Ventas Pendientes (Fiadas)', `${financials.unpaid_sales_count} ventas`, `S/ ${financials.unpaid_sales_total.toFixed(2)}`, 'Por cobrar']
       ],
       theme: 'striped',
       headStyles: { 

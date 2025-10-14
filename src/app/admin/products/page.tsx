@@ -16,22 +16,39 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Plus, Trash2, Edit, Package as PackageIcon, DollarSign, TrendingDown, Search, X, BarChart3, Calendar, History } from 'lucide-react';
 import Image from 'next/image';
 
-const AVAILABLE_IMAGES = [
-  { value: '/pngs/pilsen.png', label: 'Pilsen' },
-  { value: '/pngs/corona.png', label: 'Corona' },
-  { value: '/pngs/heineken.png', label: 'Heineken' },
-  { value: '/pngs/cristal.png', label: 'Cristal' },
-  { value: '/pngs/cusqueña.png', label: 'Cusqueña' },
-  { value: '/pngs/lacapilla.png', label: 'La Capilla' },
-  { value: '/pngs/cigarro.png', label: 'Cigarro' },
-  { value: '/pngs/halls.png', label: 'Halls' },
-  { value: '/pngs/trident.png', label: 'Trident' },
-  { value: '/pngs/ron.png', label: 'Ron' },
-  { value: '/pngs/solysombra.png', label: 'Sol y Sombra' },
-  { value: '/pngs/pickeo.png', label: 'Pickeo' },
-  { value: '/pngs/pisco.png', label: 'Pisco' },
-  { value: '/pngs/vino.png', label: 'Vino' },
-];
+const PRODUCT_IMAGE_CATEGORIES = {
+  'Cervezas': [
+    { value: '/pngs/pilsen.png', label: 'Pilsen' },
+    { value: '/pngs/corona.png', label: 'Corona' },
+    { value: '/pngs/heineken.png', label: 'Heineken' },
+    { value: '/pngs/cristal.png', label: 'Cristal' },
+    { value: '/pngs/cusqueña.png', label: 'Cusqueña' },
+  ],
+  'Licores': [
+    { value: '/pngs/lacapilla.png', label: 'La Capilla' },
+    { value: '/pngs/ron.png', label: 'Ron' },
+    { value: '/pngs/pisco.png', label: 'Pisco' },
+    { value: '/pngs/vino.png', label: 'Vino' },
+  ],
+  'Bebidas': [
+    { value: '/pngs/agua.png', label: 'Agua' },
+    { value: '/pngs/gaseosas.png', label: 'Gaseosas' },
+    { value: '/pngs/revividores.png', label: 'Revividores' },
+    { value: '/pngs/volt.png', label: 'Volt' },
+  ],
+  'Comidas': [
+    { value: '/pngs/golosinas.png', label: 'Golosinas' },
+    { value: '/pngs/pickeo.png', label: 'Pickeo' },
+    { value: '/pngs/solysombra.png', label: 'Sol y Sombra' },
+  ],
+  'Otros': [
+    { value: '/pngs/cigarro.png', label: 'Cigarro' },
+    { value: '/pngs/halls.png', label: 'Halls' },
+    { value: '/pngs/trident.png', label: 'Trident' },
+    { value: '/pngs/tizas.png', label: 'Tizas' },
+    { value: '/pngs/guantes.png', label: 'Guantes' },
+  ],
+};
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -1009,36 +1026,45 @@ export default function ProductsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Imagen del Producto
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto border border-gray-200 rounded-lg p-2">
-                {AVAILABLE_IMAGES.map((img) => (
-                  <button
-                    key={img.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, image_url: img.value })}
-                    className={`
-                      relative rounded-lg overflow-hidden border-2 transition-all bg-white p-2 sm:p-3 flex flex-col items-center gap-1 sm:gap-2
-                      ${formData.image_url === img.value 
-                        ? 'border-gray-800 bg-gray-50 scale-105' 
-                        : 'border-gray-200 hover:border-gray-300'
-                      }
-                    `}
-                  >
-                    <div className="relative w-full h-16 sm:h-20 md:h-24">
-                      <Image
-                        src={img.value}
-                        alt={img.label}
-                        fill
-                        className="object-contain"
-                        sizes="(max-width: 640px) 120px, (max-width: 768px) 150px, 200px"
-                      />
+              <div className="max-h-[450px] overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-800">
+                {Object.entries(PRODUCT_IMAGE_CATEGORIES).map(([category, images]) => (
+                  <div key={category} className="mb-4 last:mb-0">
+                    <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2 px-1">
+                      {category}
+                    </h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {images.map((img) => (
+                        <button
+                          key={img.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image_url: img.value })}
+                          className={`
+                            relative rounded-lg overflow-hidden border-2 transition-all bg-white dark:bg-gray-700 p-2 flex flex-col items-center gap-2 hover:scale-102
+                            ${formData.image_url === img.value 
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 scale-105 shadow-md' 
+                              : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                            }
+                          `}
+                        >
+                          <div className="relative w-full h-16 sm:h-20">
+                            <Image
+                              src={img.value}
+                              alt={img.label}
+                              fill
+                              className="object-contain"
+                              sizes="(max-width: 640px) 100px, 120px"
+                            />
+                          </div>
+                          <div className="text-gray-900 dark:text-gray-100 text-xs text-center font-semibold leading-tight">
+                            {img.label}
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                    <div className="text-gray-900 text-xs sm:text-sm text-center font-medium leading-tight">
-                      {img.label}
-                    </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>

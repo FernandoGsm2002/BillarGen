@@ -18,6 +18,8 @@ import {
   Settings,
   Building2
 } from 'lucide-react';
+import { SimpleThemeToggle } from '@/components/ui/theme-toggle';
+import { NotificationsDropdown } from '@/components/ui/notifications';
 import { Sidebar as UiSidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 
 interface SidebarProps {
@@ -29,13 +31,14 @@ export default function Sidebar({ role, username }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
-  // Removido: tenantId no usado directamente
+  const [user, setUser] = useState<{ id: number; tenant_id: number } | null>(null);
 
   useEffect(() => {
-    // Load tenant config
+    // Load tenant config and user data
     const userData = localStorage.getItem('user');
     if (userData) {
       const parsedUser = JSON.parse(userData);
+      setUser({ id: parsedUser.id, tenant_id: parsedUser.tenant_id });
       loadTenantConfig(parsedUser.tenant_id);
     }
   }, []);
@@ -100,27 +103,43 @@ export default function Sidebar({ role, username }: SidebarProps) {
   return (
     <UiSidebar className="border-r border-gray-200" collapsible="icon">
       <SidebarHeader className="border-b border-gray-200 p-4">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-            {logoUrl ? (
-              <Image 
-                src={logoUrl} 
-                alt={businessName} 
-                width={64} 
-                height={64} 
-                className="object-contain p-1"
-                onError={(e) => {
-                  // Fallback if image fails to load
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            ) : (
-              <Building2 size={40} className="text-gray-600" />
+        <div className="flex flex-col gap-4">
+          {/* Controles superiores - Profesionales y visibles */}
+          <div className="flex items-center justify-center gap-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600">
+            <SimpleThemeToggle />
+            {role === 'admin' && user && (
+              <NotificationsDropdown userId={user.id} tenantId={user.tenant_id} />
             )}
+            <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              {role === 'admin' ? 'Controles Admin' : 'Configuración'}
+            </div>
           </div>
-          <div className="p-3 bg-gray-100 rounded-lg w-full">
-            <p className="text-sm font-semibold text-gray-900 truncate text-center">{username}</p>
-            <p className="text-xs text-gray-600 capitalize mt-1 text-center">{role.replace('_', ' ')}</p>
+          
+          {/* Logo y usuario */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center shrink-0 overflow-hidden shadow-md border border-gray-300 dark:border-gray-600">
+              {logoUrl ? (
+                <Image 
+                  src={logoUrl} 
+                  alt={businessName} 
+                  width={64} 
+                  height={64} 
+                  className="object-contain p-1"
+                  onError={(e) => {
+                    // Fallback if image fails to load
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <Building2 size={40} className="text-gray-600 dark:text-gray-400" />
+              )}
+            </div>
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg w-full border border-gray-200 dark:border-gray-700 shadow-sm">
+              <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate text-center">{username}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 capitalize mt-1 text-center font-semibold">
+                {role.replace('_', ' ')}
+              </p>
+            </div>
           </div>
         </div>
       </SidebarHeader>
@@ -147,10 +166,10 @@ export default function Sidebar({ role, username }: SidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-5 border-t">
+      <SidebarFooter className="p-5 border-t dark:border-gray-700">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 w-full rounded-lg hover:bg-accent transition-colors text-base font-medium"
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200 text-base font-bold border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
         >
           <LogOut size={20} />
           <span>Cerrar Sesión</span>

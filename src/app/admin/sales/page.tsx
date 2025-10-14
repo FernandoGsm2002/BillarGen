@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Sidebar from '@/components/Sidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { ShoppingCart, User, Package, Calendar, CreditCard, AlertCircle, Grid3x3 } from 'lucide-react';
+import { ShoppingCart, User, Package, Calendar, CreditCard, AlertCircle, Grid3x3, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatCard, Card, CardBody } from '@/components/ui/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
@@ -55,6 +55,7 @@ export default function SalesPage() {
   const [rentals, setRentals] = useState<RentalIncome[]>([]);
   const [filter, setFilter] = useState<'all' | 'today' | 'week'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'sales' | 'rentals' | 'combined'>('all');
+  const [deletingRecord, setDeletingRecord] = useState<string>('');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -113,6 +114,70 @@ export default function SalesPage() {
   const handleFilterChange = (newFilter: 'all' | 'today' | 'week') => {
     setFilter(newFilter);
     if (user) loadData(user.tenant_id, newFilter);
+  };
+
+  const handleDeleteSale = async (saleId: number) => {
+    if (!user) return;
+    
+    const confirmDelete = confirm('¿Estás seguro de que quieres eliminar esta venta? Esta acción no se puede deshacer.');
+    if (!confirmDelete) return;
+
+    setDeletingRecord(`sale-${saleId}`);
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', saleId)
+        .eq('tenant_id', user.tenant_id);
+
+      if (error) {
+        console.error('Error eliminando venta:', error);
+        alert('❌ Error al eliminar la venta');
+        return;
+      }
+
+      // Recargar datos
+      loadData(user.tenant_id, filter);
+      
+      alert('✅ Venta eliminada correctamente');
+    } catch (error) {
+      console.error('Error en handleDeleteSale:', error);
+      alert('❌ Error inesperado al eliminar la venta');
+    } finally {
+      setDeletingRecord('');
+    }
+  };
+
+  const handleDeleteRental = async (rentalId: number) => {
+    if (!user) return;
+    
+    const confirmDelete = confirm('¿Estás seguro de que quieres eliminar esta renta? Esta acción no se puede deshacer.');
+    if (!confirmDelete) return;
+
+    setDeletingRecord(`rental-${rentalId}`);
+    try {
+      const { error } = await supabase
+        .from('rentals')
+        .delete()
+        .eq('id', rentalId)
+        .eq('tenant_id', user.tenant_id);
+
+      if (error) {
+        console.error('Error eliminando renta:', error);
+        alert('❌ Error al eliminar la renta');
+        return;
+      }
+
+      // Recargar datos
+      loadData(user.tenant_id, filter);
+      
+      alert('✅ Renta eliminada correctamente');
+    } catch (error) {
+      console.error('Error en handleDeleteRental:', error);
+      alert('❌ Error inesperado al eliminar la renta');
+    } finally {
+      setDeletingRecord('');
+    }
   };
 
   if (!user) {
@@ -389,6 +454,7 @@ export default function SalesPage() {
                         <TableHead>Total</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Fecha</TableHead>
+                        <TableHead>Acción</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -441,6 +507,26 @@ export default function SalesPage() {
                                 {new Date(income.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                if (income.type === 'sale') {
+                                  const saleId = parseInt(income.id.split('-')[1]);
+                                  handleDeleteSale(saleId);
+                                } else {
+                                  const rentalId = parseInt(income.id.split('-')[1]);
+                                  handleDeleteRental(rentalId);
+                                }
+                              }}
+                              disabled={deletingRecord === income.id}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                              title={`Eliminar ${income.type === 'sale' ? 'venta' : 'renta'}`}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -522,8 +608,28 @@ export default function SalesPage() {
                             <Calendar size={12} className="mr-1" />
                             {new Date(income.date).toLocaleDateString('es-PE')} {new Date(income.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
                           </div>
-                          <div className="text-lg font-bold text-gray-900">
-                            S/ {income.amount.toFixed(2)}
+                          <div className="flex items-center gap-2">
+                            <div className="text-lg font-bold text-gray-900">
+                              S/ {income.amount.toFixed(2)}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                if (income.type === 'sale') {
+                                  const saleId = parseInt(income.id.split('-')[1]);
+                                  handleDeleteSale(saleId);
+                                } else {
+                                  const rentalId = parseInt(income.id.split('-')[1]);
+                                  handleDeleteRental(rentalId);
+                                }
+                              }}
+                              disabled={deletingRecord === income.id}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                              title={`Eliminar ${income.type === 'sale' ? 'venta' : 'renta'}`}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
                           </div>
                         </div>
                       </div>

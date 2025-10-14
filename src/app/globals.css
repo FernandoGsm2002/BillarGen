@@ -131,48 +131,116 @@
     padding: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-optical-sizing: auto;
-    font-variation-settings: "wght" 400;
+    font-variation-settings: "wght" 600; /* Cambiado de 400 a 600 para más bold */
+    font-weight: 600; /* Peso por defecto más bold */
   }
   
-  /* Enhanced typography for better readability */
+  /* Enhanced typography for better readability - MORE BOLD */
   h1, h2, h3, h4, h5, h6 {
-    font-weight: 700;
+    font-weight: 800; /* Más bold */
     letter-spacing: -0.025em;
     line-height: 1.2;
-    font-variation-settings: "wght" 700;
+    font-variation-settings: "wght" 800;
   }
   
   h1 {
     @apply text-2xl sm:text-3xl lg:text-4xl;
-    font-weight: 800;
-    font-variation-settings: "wght" 800;
+    font-weight: 900; /* Extra bold */
+    font-variation-settings: "wght" 900;
   }
   
   h2 {
     @apply text-xl sm:text-2xl lg:text-3xl;
-    font-weight: 700;
+    font-weight: 800; /* Más bold */
   }
   
   h3 {
     @apply text-lg sm:text-xl lg:text-2xl;
-    font-weight: 600;
+    font-weight: 700; /* Más bold */
   }
   
-  /* Strong text styling */
+  /* Hacer todo el texto más bold por defecto */
+  p, span, div, td, th, li {
+    font-weight: 600 !important; /* Forzar peso bold por defecto */
+  }
+  
+  /* Labels y texto importante aún más bold */
+  label, .font-medium, .text-sm, .text-xs {
+    font-weight: 700 !important;
+  }
+
+  /* Mejorar contraste en tema oscuro - texto */
+  .dark p, .dark span, .dark div, .dark td, .dark th, .dark li {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  .dark .text-muted-foreground {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+  
+  .dark .text-gray-600 {
+    color: hsl(240 5% 70%) !important; /* Gris más claro en dark mode */
+  }
+  
+  .dark .text-gray-700 {
+    color: hsl(240 5% 75%) !important; /* Gris más claro en dark mode */
+  }
+  
+  .dark .text-gray-800 {
+    color: hsl(240 5% 80%) !important; /* Gris más claro en dark mode */
+  }
+  
+  .dark .text-gray-900 {
+    color: hsl(var(--foreground)) !important; /* Texto principal en dark mode */
+  }
+  
+  /* Strong text styling - EXTRA BOLD */
   strong, .font-bold {
-    font-weight: 700;
-    font-variation-settings: "wght" 700;
-  }
-  
-  .font-extrabold {
-    font-weight: 800;
+    font-weight: 800 !important; /* Más bold */
     font-variation-settings: "wght" 800;
   }
   
-  /* Button text enhancement */
+  .font-extrabold {
+    font-weight: 900 !important; /* Extra bold */
+    font-variation-settings: "wght" 900;
+  }
+  
+  /* Button text enhancement - BOLD */
   button {
-    font-weight: 500;
+    font-weight: 700 !important; /* Botones más bold */
     letter-spacing: 0.01em;
+  }
+  
+  /* Inputs y form elements más bold */
+  input, textarea, select {
+    font-weight: 600 !important;
+  }
+
+  /* Mejorar visibilidad de elementos en dark mode */
+  .dark input, .dark textarea, .dark select {
+    background-color: hsl(var(--input)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  .dark .bg-gray-50 {
+    background-color: hsl(240 4% 20%) !important;
+  }
+  
+  .dark .bg-gray-100 {
+    background-color: hsl(240 4% 25%) !important;
+  }
+  
+  .dark .bg-gray-200 {
+    background-color: hsl(240 4% 30%) !important;
+  }
+  
+  .dark .border-gray-200 {
+    border-color: hsl(240 4% 30%) !important;
+  }
+  
+  .dark .border-gray-300 {
+    border-color: hsl(240 4% 35%) !important;
   }
   
   /* Card titles */

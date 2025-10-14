@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DollarSign, ShoppingCart, Users, Package, Calendar, Download, FileText, FileSpreadsheet, Eye, BarChart3, Activity, TrendingDown, TrendingUpIcon, Clock, CreditCard, Banknote, Calculator } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Trash2 } from 'lucide-react';
 
 interface WeeklyStats {
   week: string;
@@ -131,6 +132,7 @@ export default function StatsPage() {
   const [declaredAmount, setDeclaredAmount] = useState<string>('');
   const [showDeclaredAmountInput, setShowDeclaredAmountInput] = useState(false);
   const [generatingSessionPDF, setGeneratingSessionPDF] = useState(false);
+  const [deletingRecord, setDeletingRecord] = useState<string>('');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -578,6 +580,74 @@ export default function StatsPage() {
     const difference = actualAmount - declaredAmount;
     const percentage = actualAmount > 0 ? (difference / actualAmount) * 100 : 0;
     return { difference, percentage };
+  };
+
+  const handleDeleteSale = async (saleId: number) => {
+    if (!user) return;
+    
+    const confirmDelete = confirm('¿Estás seguro de que quieres eliminar esta venta? Esta acción no se puede deshacer.');
+    if (!confirmDelete) return;
+
+    setDeletingRecord(`sale-${saleId}`);
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', saleId)
+        .eq('tenant_id', user.tenant_id);
+
+      if (error) {
+        console.error('Error eliminando venta:', error);
+        alert('❌ Error al eliminar la venta');
+        return;
+      }
+
+      // Recargar datos de la sesión
+      if (selectedSession) {
+        await loadSessionFinancials(selectedSession);
+      }
+      
+      alert('✅ Venta eliminada correctamente');
+    } catch (error) {
+      console.error('Error en handleDeleteSale:', error);
+      alert('❌ Error inesperado al eliminar la venta');
+    } finally {
+      setDeletingRecord('');
+    }
+  };
+
+  const handleDeleteRental = async (rentalId: number) => {
+    if (!user) return;
+    
+    const confirmDelete = confirm('¿Estás seguro de que quieres eliminar esta renta? Esta acción no se puede deshacer.');
+    if (!confirmDelete) return;
+
+    setDeletingRecord(`rental-${rentalId}`);
+    try {
+      const { error } = await supabase
+        .from('rentals')
+        .delete()
+        .eq('id', rentalId)
+        .eq('tenant_id', user.tenant_id);
+
+      if (error) {
+        console.error('Error eliminando renta:', error);
+        alert('❌ Error al eliminar la renta');
+        return;
+      }
+
+      // Recargar datos de la sesión
+      if (selectedSession) {
+        await loadSessionFinancials(selectedSession);
+      }
+      
+      alert('✅ Renta eliminada correctamente');
+    } catch (error) {
+      console.error('Error en handleDeleteRental:', error);
+      alert('❌ Error inesperado al eliminar la renta');
+    } finally {
+      setDeletingRecord('');
+    }
   };
 
   const generateSessionPDF = async (session: DailySession, financials: SessionFinancials) => {
@@ -1234,7 +1304,7 @@ export default function StatsPage() {
                   </div>
 
                   {/* Resumen Financiero Compacto */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div className="bg-white p-3 rounded-lg border shadow-sm">
                       <p className="text-xs text-gray-600 font-medium">Total Ventas</p>
                       <p className="text-lg font-bold text-green-600">S/ {sessionFinancials.total_sales_revenue.toFixed(2)}</p>
@@ -1249,11 +1319,6 @@ export default function StatsPage() {
                       <p className="text-xs text-gray-600 font-medium">Total General</p>
                       <p className="text-lg font-bold text-purple-600">S/ {sessionFinancials.total_revenue.toFixed(2)}</p>
                       <p className="text-xs text-gray-500">Todo incluido</p>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border shadow-sm">
-                      <p className="text-xs text-gray-600 font-medium">Promedio/Hora</p>
-                      <p className="text-lg font-bold text-orange-600">S/ {(sessionFinancials.total_revenue / sessionFinancials.total_hours).toFixed(2)}</p>
-                      <p className="text-xs text-gray-500">Rentabilidad</p>
                     </div>
                   </div>
 
@@ -1342,13 +1407,25 @@ export default function StatsPage() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right ml-2">
-                                <div className={`font-bold ${!sale.is_paid ? 'text-red-600' : 'text-green-600'}`}>
-                                  S/ {sale.total_amount.toFixed(2)}
+                              <div className="flex items-center gap-2 ml-2">
+                                <div className="text-right">
+                                  <div className={`font-bold ${!sale.is_paid ? 'text-red-600' : 'text-green-600'}`}>
+                                    S/ {sale.total_amount.toFixed(2)}
+                                  </div>
+                                  {!sale.is_paid && (
+                                    <div className="text-xs text-red-500">Pendiente</div>
+                                  )}
                                 </div>
-                                {!sale.is_paid && (
-                                  <div className="text-xs text-red-500">Pendiente</div>
-                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteSale(sale.id)}
+                                  disabled={deletingRecord === `sale-${sale.id}`}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  title="Eliminar venta"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -1388,8 +1465,20 @@ export default function StatsPage() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right ml-2">
-                                <div className="font-bold text-blue-600">S/ {rental.total_amount.toFixed(2)}</div>
+                              <div className="flex items-center gap-2 ml-2">
+                                <div className="text-right">
+                                  <div className="font-bold text-blue-600">S/ {rental.total_amount.toFixed(2)}</div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteRental(rental.id)}
+                                  disabled={deletingRecord === `rental-${rental.id}`}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  title="Eliminar renta"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
                               </div>
                             </div>
                           ))}
