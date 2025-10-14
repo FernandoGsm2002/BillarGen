@@ -1,0 +1,44 @@
+{
+  "name": "BillarGen - Gestión de Billar",
+  "short_name": "BillarGen",
+  "description": "Sistema de gestión para billares - Ventas, rentas y control de sesiones",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f2937",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/pngs/logologin.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/pngs/logologin.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/pngs/logologin.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/pngs/logologin.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "prefer_related_applications": false,
+  "lang": "es",
+  "dir": "ltr",
+  "scope": "/",
+  "id": "billargen-pwa"
+}

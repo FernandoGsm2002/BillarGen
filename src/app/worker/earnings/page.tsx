@@ -473,55 +473,79 @@ export default function WorkerEarningsPage() {
               />
             </div>
 
-            {/* Filtros */}
-            <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-              <div className="flex gap-3">
+            {/* Filtros Responsive */}
+            <div className="mb-6 space-y-4">
+              {/* Filtros de tiempo - Responsive grid */}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2">Período</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <Button
                   variant={filter === 'all' ? 'default' : 'outline'}
                   onClick={() => handleFilterChange('all')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
                 >
                   Todos
                 </Button>
                 <Button
                   variant={filter === 'today' ? 'default' : 'outline'}
                   onClick={() => handleFilterChange('today')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
                 >
                   Hoy
                 </Button>
                 <Button
                   variant={filter === 'week' ? 'default' : 'outline'}
                   onClick={() => handleFilterChange('week')}
-                >
-                  Última Semana
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    Semana
+                  </Button>
+                  <Button
+                    variant={filter === 'sessions' ? 'default' : 'outline'}
+                    onClick={() => handleFilterChange('sessions')}
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                  >
+                    Sesiones
                 </Button>
-                <Button
-                  variant={filter === 'sessions' ? 'default' : 'outline'}
-                  onClick={() => handleFilterChange('sessions')}
-                >
-                  Sesiones
-                </Button>
+                </div>
               </div>
               
-              <div className="flex gap-3">
+              {/* Filtros de tipo - Solo si no está en sesiones */}
+              {filter !== 'sessions' && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Tipo</p>
+                  <div className="grid grid-cols-3 gap-2">
                 <Button
                   variant={typeFilter === 'all' ? 'secondary' : 'outline'}
                   onClick={() => setTypeFilter('all')}
+                      size="sm"
+                      className="text-xs sm:text-sm"
                 >
                   Todos
                 </Button>
                 <Button
                   variant={typeFilter === 'sales' ? 'secondary' : 'outline'}
                   onClick={() => setTypeFilter('sales')}
+                      size="sm"
+                      className="text-xs sm:text-sm"
                 >
                   Ventas
                 </Button>
                 <Button
                   variant={typeFilter === 'rentals' ? 'secondary' : 'outline'}
                   onClick={() => setTypeFilter('rentals')}
+                      size="sm"
+                      className="text-xs sm:text-sm"
                 >
                   Rentas
                 </Button>
               </div>
+                </div>
+              )}
             </div>
 
             {/* Lista de Ingresos o Sesiones */}
@@ -563,38 +587,53 @@ export default function WorkerEarningsPage() {
                               </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                              <div className="bg-white p-3 rounded border border-green-200">
+                            {/* Stats grid responsive */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                              <div className="bg-white dark:bg-gray-800 p-2 sm:p-3 rounded border border-green-200 dark:border-green-700">
                                 <div className="flex items-center gap-1 mb-1">
-                                  <ShoppingCart size={14} className="text-green-600" />
-                                  <span className="text-xs font-bold text-green-700">Ventas</span>
+                                  <ShoppingCart size={12} className="text-green-600" />
+                                  <span className="text-xs font-bold text-green-700 dark:text-green-400">Ventas</span>
                                 </div>
-                                <div className="text-lg font-bold text-green-800">S/ {session.stats.sales_revenue.toFixed(2)}</div>
-                                <div className="text-xs text-green-600 font-semibold">{session.stats.products_sold} productos</div>
+                                <div className="text-sm sm:text-lg font-bold text-green-800 dark:text-green-300">
+                                  S/ {session.stats.sales_revenue.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-green-600 dark:text-green-400 font-semibold">
+                                  {session.stats.products_sold} productos
+                                </div>
                               </div>
-                              <div className="bg-white p-3 rounded border border-blue-200">
+                              <div className="bg-white dark:bg-gray-800 p-2 sm:p-3 rounded border border-blue-200 dark:border-blue-700">
                                 <div className="flex items-center gap-1 mb-1">
-                                  <Clock size={14} className="text-blue-600" />
-                                  <span className="text-xs font-bold text-blue-700">Rentas</span>
+                                  <Clock size={12} className="text-blue-600" />
+                                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400">Rentas</span>
                                 </div>
-                                <div className="text-lg font-bold text-blue-800">S/ {session.stats.rentals_revenue.toFixed(2)}</div>
-                                <div className="text-xs text-blue-600 font-semibold">{session.stats.rentals_completed} mesas</div>
+                                <div className="text-sm sm:text-lg font-bold text-blue-800 dark:text-blue-300">
+                                  S/ {session.stats.rentals_revenue.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                                  {session.stats.rentals_completed} mesas
+                                </div>
                               </div>
-                              <div className="bg-white p-3 rounded border border-purple-200">
+                              <div className="bg-white dark:bg-gray-800 p-2 sm:p-3 rounded border border-purple-200 dark:border-purple-700">
                                 <div className="flex items-center gap-1 mb-1">
-                                  <CreditCard size={14} className="text-green-600" />
-                                  <span className="text-xs font-bold text-green-700">Pagado</span>
+                                  <CreditCard size={12} className="text-green-600" />
+                                  <span className="text-xs font-bold text-green-700 dark:text-green-400">Pagado</span>
                                 </div>
-                                <div className="text-lg font-bold text-green-800">S/ {session.stats.paid_sales_total.toFixed(2)}</div>
-                                <div className="text-xs text-green-600 font-semibold">Efectivo recibido</div>
+                                <div className="text-sm sm:text-lg font-bold text-green-800 dark:text-green-300">
+                                  S/ {session.stats.paid_sales_total.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-green-600 dark:text-green-400 font-semibold">Efectivo</div>
                               </div>
-                              <div className="bg-white p-3 rounded border border-red-200">
+                              <div className="bg-white dark:bg-gray-800 p-2 sm:p-3 rounded border border-red-200 dark:border-red-700">
                                 <div className="flex items-center gap-1 mb-1">
-                                  <AlertCircle size={14} className="text-red-600" />
-                                  <span className="text-xs font-bold text-red-700">Fiado</span>
+                                  <AlertCircle size={12} className="text-red-600" />
+                                  <span className="text-xs font-bold text-red-700 dark:text-red-400">Fiado</span>
                                 </div>
-                                <div className="text-lg font-bold text-red-800">S/ {session.stats.unpaid_sales_total.toFixed(2)}</div>
-                                <div className="text-xs text-red-600 font-semibold">{session.stats.unpaid_sales_count} pendientes</div>
+                                <div className="text-sm sm:text-lg font-bold text-red-800 dark:text-red-300">
+                                  S/ {session.stats.unpaid_sales_total.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-red-600 dark:text-red-400 font-semibold">
+                                  {session.stats.unpaid_sales_count} pendientes
+                                </div>
                               </div>
                             </div>
 
@@ -734,51 +773,92 @@ export default function WorkerEarningsPage() {
                   )
                 ) : combinedData.length > 0 ? (
                   <>
-                    {/* Vista móvil - Cards */}
-                    <div className="md:hidden divide-y divide-gray-200">
+                    {/* Vista completa - Cards responsivos (sin tablas) */}
+                    <div className="space-y-3 p-3">
                       {combinedData.map((item) => (
-                        <div key={item.id} className="p-4 space-y-3">
-                          <div className="flex items-center justify-between">
+                        <div key={item.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                          {/* Header del card */}
+                          <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                item.type === 'sale' ? 'bg-blue-100' : 'bg-purple-100'
+                                item.type === 'sale' 
+                                  ? 'bg-blue-100 dark:bg-blue-900/30' 
+                                  : 'bg-purple-100 dark:bg-purple-900/30'
                               }`}>
                                 {item.type === 'sale' ? (
-                                  <ShoppingCart size={20} className={item.type === 'sale' ? 'text-blue-600' : 'text-purple-600'} />
+                                  <ShoppingCart size={18} className="text-blue-600 dark:text-blue-400" />
                                 ) : (
-                                  <Clock size={20} className="text-purple-600" />
+                                  <Clock size={18} className="text-purple-600 dark:text-purple-400" />
                                 )}
                               </div>
-                              <div>
-                                <div className="text-sm font-bold text-gray-900">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
                                   {item.type === 'sale' ? item.product_name : `Mesa ${item.table_name}`}
                                 </div>
-                                <div className="text-xs text-gray-500">{item.client_name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  {item.client_name}
+                                </div>
                               </div>
                             </div>
-                            <Badge variant={item.is_paid ? 'success' : 'danger'}>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-1">
+                                S/ {item.amount.toFixed(2)}
+                              </div>
+                              <Badge variant={item.is_paid ? 'success' : 'danger'} className="text-xs">
                               {item.is_paid ? 'Pagado' : 'Pendiente'}
                             </Badge>
+                            </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3 text-sm">
+                          {/* Detalles del card */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                             <div>
-                              <span className="text-gray-600">Monto:</span>
-                              <p className="font-bold text-green-600">S/ {item.amount.toFixed(2)}</p>
+                              <span className="text-gray-500 dark:text-gray-400 text-xs block">Fecha:</span>
+                              <div className="flex items-center gap-1">
+                                <Calendar size={12} className="text-gray-400" />
+                                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                  {new Date(item.date).toLocaleDateString('es-PE')}
+                                </span>
+                              </div>
                             </div>
+                            
                             <div>
-                              <span className="text-gray-600">Fecha:</span>
-                              <p className="text-xs">{new Date(item.date).toLocaleDateString('es-PE')}</p>
+                              <span className="text-gray-500 dark:text-gray-400 text-xs block">Hora:</span>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                {new Date(item.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
+
                             {item.type === 'sale' && (
                               <>
                                 <div>
-                                  <span className="text-gray-600">Cantidad:</span>
-                                  <p className="font-semibold">{item.quantity}</p>
+                                  <span className="text-gray-500 dark:text-gray-400 text-xs block">Cantidad:</span>
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {item.quantity}x
+                                  </span>
                                 </div>
                                 <div>
-                                  <span className="text-gray-600">Mesa:</span>
-                                  <p className="text-sm">{item.table_name}</p>
+                                  <span className="text-gray-500 dark:text-gray-400 text-xs block">Mesa:</span>
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+                                    {item.table_name}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+
+                            {item.type === 'rental' && (
+                              <>
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400 text-xs block">Tipo:</span>
+                                  <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                                    Renta Mesa
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400 text-xs block">Estado:</span>
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    Finalizada
+                                  </span>
                                 </div>
                               </>
                             )}
@@ -787,62 +867,6 @@ export default function WorkerEarningsPage() {
                       ))}
                     </div>
 
-                    {/* Vista desktop - Tabla */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Detalle</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Cliente</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Mesa</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Monto</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Fecha</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {combinedData.map((item) => (
-                            <tr key={item.id} className="hover:bg-muted/30">
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  {item.type === 'sale' ? (
-                                    <ShoppingCart size={16} className="text-blue-600" />
-                                  ) : (
-                                    <Clock size={16} className="text-purple-600" />
-                                  )}
-                                  <span className="font-medium capitalize">
-                                    {item.type === 'sale' ? 'Venta' : 'Renta'}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-gray-900">
-                                  {item.type === 'sale' ? item.product_name : `Mesa ${item.table_name}`}
-                                </div>
-                                {item.type === 'sale' && (
-                                  <div className="text-sm text-gray-500">Cantidad: {item.quantity}</div>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.client_name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.table_name}</td>
-                              <td className="px-4 py-3 font-bold text-green-600">S/ {item.amount.toFixed(2)}</td>
-                              <td className="px-4 py-3">
-                                <Badge variant={item.is_paid ? 'success' : 'danger'} className="text-xs">
-                                  {item.is_paid ? 'Pagado' : 'Pendiente'}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Calendar size={14} />
-                                  {new Date(item.date).toLocaleDateString('es-PE')}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
                   </>
                 ) : (
                   <div className="text-center py-12">

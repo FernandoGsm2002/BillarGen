@@ -10,6 +10,7 @@ import { StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Users, Package, ShoppingCart, Play, Square, Clock } from 'lucide-react';
 import Image from 'next/image';
+import { initializePushNotifications, showLocalNotification } from '@/lib/pushNotifications';
 
 export default function WorkerDashboard() {
   const router = useRouter();
@@ -46,6 +47,13 @@ export default function WorkerDashboard() {
     loadData(parsedUser.tenant_id, parsedUser.id);
     loadTenantConfig(parsedUser.tenant_id);
     loadCurrentSession(parsedUser.tenant_id, parsedUser.id);
+
+    // Inicializar notificaciones push
+    initializePushNotifications().then(success => {
+      if (success) {
+        console.log('Notificaciones push habilitadas');
+      }
+    });
   }, [router]);
 
   const loadTenantConfig = async (tenantId: number) => {
@@ -196,6 +204,13 @@ export default function WorkerDashboard() {
       // Crear notificación para el admin
       await createSessionNotification('session_start', newSession, user);
       
+      // Mostrar notificación local
+      showLocalNotification(
+        '🟢 Sesión Iniciada',
+        `Sesión "${sessionName}" iniciada correctamente`,
+        { sessionId: newSession.id }
+      );
+      
       alert(`✅ Sesión "${sessionName}" iniciada correctamente`);
     } catch (error) {
       console.error('Error en startDaySession:', error);
@@ -226,6 +241,13 @@ export default function WorkerDashboard() {
 
       // Crear notificación para el admin
       await createSessionNotification('session_end', currentSession, user);
+      
+      // Mostrar notificación local
+      showLocalNotification(
+        '🔴 Sesión Finalizada',
+        `Sesión "${currentSession.session_name}" finalizada correctamente`,
+        { sessionId: currentSession.id }
+      );
       
       setCurrentSession(null);
       setSessionDuration('0h 0m');
